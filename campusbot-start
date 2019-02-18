@@ -1,0 +1,26 @@
+export TELEGRAM_BOT_TOKEN="$(grep TELEGRAM_BOT_TOKEN .env | sed 's/.*=//' | tr -d " '|\" ")"
+export NGROK_PATH="$(grep NGROK_PATH .env | sed 's/.*=//' | tr -d " '|\" ")"
+export BOT_PORT="$(grep PORT .env | sed 's/.*=//' | tr -d " '|\" ")"
+
+cd $NGROK_PATH && ./ngrok start --none > /dev/null &
+sleep 5
+curl -X POST \
+  http://localhost:4040/api/tunnels \
+  -H 'Content-Type: application/json' \
+  -H 'Postman-Token: eb743302-416d-4c5e-917b-310754a6cb8e' \
+  -H 'cache-control: no-cache' \
+  -d '{
+  "addr":  "'"$BOT_PORT"'",
+  "proto": "http",
+  "name": "campusbot"
+}'
+export NGROK_CAMPUSBOT_URL="$(curl --silent --show-error http://127.0.0.1:4040/api/tunnels/campusbot | sed -nE 's/.*public_url":"([^"]*).*/\1/p')"
+source venv/bin/activate
+python app.py
+
+end_ngrok_tunnel() {
+    curl -X DELETE http://localhost:4040/api/tunnels/campusbot
+    kill -- -$$
+}
+
+trap end_ngrok_tunnel SIGINT SIGTERM

@@ -1,16 +1,9 @@
 from telegram.ext import Updater, CommandHandler
 import logging
-from dotenv import load_dotenv, find_dotenv
-import os
+import settings as env
 from dialoguemanager.response import generalCopywriting
 
-load_dotenv(find_dotenv())
-
-NGROK_CAMPUSBOT_URL = os.getenv('NGROK_CAMPUSBOT_URL')
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-PORT = int(os.getenv('PORT'))
-
-updater = Updater(token=TELEGRAM_BOT_TOKEN)
+updater = Updater(token=env.TELEGRAM_BOT_TOKEN)
 dispatcher = updater.dispatcher
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -23,6 +16,6 @@ def start(bot, update):
 start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)
 
-updater.start_webhook(listen='0.0.0.0', port=PORT, url_path=TELEGRAM_BOT_TOKEN, webhook_url=NGROK_CAMPUSBOT_URL+'/'+TELEGRAM_BOT_TOKEN)
-updater.bot.set_webhook(NGROK_CAMPUSBOT_URL+'/'+TELEGRAM_BOT_TOKEN)
+updater.start_webhook(listen='0.0.0.0', port=env.PORT, url_path=env.TELEGRAM_BOT_TOKEN, webhook_url=env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)
+updater.bot.set_webhook(env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)
 updater.idle()

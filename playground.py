@@ -1,6 +1,3 @@
-from db.firestoreClient import FirestoreClient
-import settings as env
+import db.firestoreClient as FirestoreClient
 
-firestoreClient = FirestoreClient(env.FIRESTORE_SERVICE_ACCOUNT_PATH)
-
-print(firestoreClient.getCollection('tasks', populate=True))
+print(FirestoreClient.getDocument('tasks', 'create-place', populate=True))

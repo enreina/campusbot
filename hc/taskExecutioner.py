@@ -35,16 +35,24 @@ class TaskExecutioner(object):
 
             # move to next question
             self.currentQuestionNumber += 1
-            if self.currentQuestionNumber >= len(self.task.questions):
+            if self.currentQuestionNumber >= self.numOfStates:
                 self.currentQuestionNumber = ConversationHandler.END
-                formattedClosingStatement = self.task.closingStatement.format(item=self.temporaryAnswer)
-                bot.send_message(chat_id=update.message.chat_id, text=formattedClosingStatement, parse_mode='Markdown')
+                self.sendClosingStatement(bot, update)
+            elif self.currentQuestionNumber >= len(self.task.questions):
+                self.sendConfirmation(bot, update)
             else:
                 self.sendCurrentQuestion(bot, update)
 
             return self.currentQuestionNumber
 
+        def confirmationHandler(bot, update):
+            self.sendClosingStatement(bot, update)
+
+            return ConversationHandler.END
+
         states = {}
+        hasConfirmation = False
+
         for questionNumber, question in enumerate(self.task.questions):
             # create handler
             if question['type'] == 'image':
@@ -54,6 +62,16 @@ class TaskExecutioner(object):
             elif question['type'] == 'text':
                 handler = MessageHandler(Filters.text, questionHandler)
             states[questionNumber] = [handler]
+            
+            if 'confirmationText' in question: 
+                hasConfirmation = True
+
+        if hasConfirmation:
+            states[len(self.task.questions)] = [MessageHandler(Filters.text, confirmationHandler)]
+            self.numOfStates = len(self.task.questions) + 1
+        else:
+            self.numOfStates = len(self.task.questions)
+        
 
         # fallback
         def fallback(bot, update):
@@ -92,3 +110,25 @@ class TaskExecutioner(object):
         elif currentQuestion['type'] == 'location':
             self.temporaryAnswer[currentQuestion['property']] = update.message.location
         
+    def sendConfirmation(self, bot, update):
+        for question in self.task.questions:
+            if 'confirmationText' in question:
+                formattedConfirmation = question['confirmationText'].format(item=self.temporaryAnswer)
+                if question['type'] == 'text':
+                    bot.send_message(chat_id=update.message.chat_id, text=formattedConfirmation, parse_mode='Markdown')
+                elif question['type'] == 'image':
+                    image = self.temporaryAnswer[question['property']]
+                    bot.send_photo(chat_id=update.message.chat_id, photo=image, caption=formattedConfirmation, parse_mode='Markdown')
+                elif question['type'] == 'location':
+                    location = self.temporaryAnswer[question['property']]
+                    bot.send_message(chat_id=update.message.chat_id, text=formattedConfirmation, parse_mode='Markdown')
+                    bot.send_location(chat_id=update.message.chat_id, location=location)
+        # send is that correct
+        replyMarkup = {"keyboard": [[generalCopywriting.YES_BUTTON_TEXT], [generalCopywriting.NO_BUTTON_TEXT]]}
+        bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.ASK_DATA_CONFIRMATION_TEXT, reply_markup=replyMarkup, parse_mode='Markdown')
+
+
+    def sendClosingStatement(self, bot, update):
+        formattedClosingStatement = self.task.closingStatement.format(item=self.temporaryAnswer)
+        replyMarkup = {"remove_keyboard": True}
+        bot.send_message(chat_id=update.message.chat_id, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')

@@ -10,3 +10,8 @@ Try one of these commands to start:
 /trashbins - sharing photos of trash bins on campus? why not! 🗑'''
 
 SEND_LOCATION_TEXT = "Send My Location 📍"
+
+ASK_DATA_CONFIRMATION_TEXT = "Is that correct?"
+
+YES_BUTTON_TEXT = "Yes 👍"
+NO_BUTTON_TEXT = "No 👎"

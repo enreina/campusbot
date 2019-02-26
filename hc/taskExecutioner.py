@@ -1,5 +1,6 @@
 from db.task import Task
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler
+from dialoguemanager.response import generalCopywriting
 
 class TaskExecutioner(object):
     '''Execute a certain task
@@ -12,6 +13,7 @@ class TaskExecutioner(object):
     def __init__(self, taskId):
         self.task = Task.getTaskById(taskId) # load task from db
         self.currentQuestionNumber = 0 # start from opening statement
+        self.temporaryAnswer = {}
         self.initConversationHandler()
 
     def initConversationHandler(self):
@@ -26,6 +28,12 @@ class TaskExecutioner(object):
 
         # individual state handler
         def questionHandler(bot, update):
+            # save to temporary answer
+            self.saveTemporaryAnswer(bot, update)
+            # send response of current question
+            self.sendCurrentQuestionResponse(bot, update)
+
+            # move to next question
             self.currentQuestionNumber += 1
             if self.currentQuestionNumber >= len(self.task.questions):
                 self.currentQuestionNumber = ConversationHandler.END
@@ -40,10 +48,11 @@ class TaskExecutioner(object):
             # create handler
             if question['type'] == 'image':
                 handler = MessageHandler(Filters.photo, questionHandler)
+            elif question['type'] == 'location':
+                handler = MessageHandler(Filters.location, questionHandler)
             elif question['type'] == 'text':
                 handler = MessageHandler(Filters.text, questionHandler)
             states[questionNumber] = [handler]
-        print(states)
 
         # fallback
         def fallback(bot, update):
@@ -57,16 +66,25 @@ class TaskExecutioner(object):
 
     def sendCurrentQuestion(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
-        bot.send_message(chat_id=update.message.chat_id, text=currentQuestion['text'], parse_mode='Markdown')
-    # def startTask(bot, update):
-    #     bot.send_message(chat_id=update.message.chat_id, text=self.task.openingStatement, parse_mode='Markdown')
-        
-    #     return self.currentQuestionNumber
-    
-    # def sendCurrentQuestion(self):
-    #     currentQuestion = self.task.questions[self.currentQuestionNumber]
+        if currentQuestion['type'] == 'location':
+            replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
+        else:
+            replyMarkup = {"remove_keyboard": True}
 
-    #     if self.bot and self.chatId:
-    #         self.bot.send_message(chat_id=self.chatId, text=currentQuestion['text'], parse_mode='Markdown')
-        
+        bot.send_message(chat_id=update.message.chat_id, text=currentQuestion['text'], reply_markup=replyMarkup, parse_mode='Markdown')
+
+    def sendCurrentQuestionResponse(self, bot, update):
+        currentQuestion = self.task.questions[self.currentQuestionNumber]
+        bot.send_message(chat_id=update.message.chat_id, text=currentQuestion['responseOk'], parse_mode='Markdown')
+
+    def saveTemporaryAnswer(self, bot, update):
+        currentQuestion = self.task.questions[self.currentQuestionNumber]
+        if currentQuestion['type'] == 'text':
+            self.temporaryAnswer[currentQuestion['property']] = update.message.text
+        elif currentQuestion['type'] == 'image':
+            self.temporaryAnswer[currentQuestion['property']] = update.message.photo[0].file_id
+        elif currentQuestion['type'] == 'location':
+            self.temporaryAnswer[currentQuestion['property']] = update.message.location
+
+        print(self.temporaryAnswer)
         

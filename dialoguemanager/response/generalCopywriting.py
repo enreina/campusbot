@@ -8,3 +8,5 @@ Try one of these commands to start:
 /place - let other students know if there is any study space or bike parking space available 📌
 /food - share food that you like - or you don't like, bought in campus 🍔
 /trashbins - sharing photos of trash bins on campus? why not! 🗑'''
+
+SEND_LOCATION_TEXT = "Send My Location 📍"

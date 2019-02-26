@@ -37,7 +37,8 @@ class TaskExecutioner(object):
             self.currentQuestionNumber += 1
             if self.currentQuestionNumber >= len(self.task.questions):
                 self.currentQuestionNumber = ConversationHandler.END
-                bot.send_message(chat_id=update.message.chat_id, text=self.task.closingStatement, parse_mode='Markdown')
+                formattedClosingStatement = self.task.closingStatement.format(item=self.temporaryAnswer)
+                bot.send_message(chat_id=update.message.chat_id, text=formattedClosingStatement, parse_mode='Markdown')
             else:
                 self.sendCurrentQuestion(bot, update)
 
@@ -57,7 +58,8 @@ class TaskExecutioner(object):
         # fallback
         def fallback(bot, update):
             currentQuestion = self.task.questions[self.currentQuestionNumber]
-            bot.send_message(chat_id=update.message.chat_id, text=currentQuestion['responseError'], parse_mode='Markdown')
+            formattedResponseError = currentQuestion['responseError'].format(item=self.temporaryAnswer)
+            bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
 
             return self.currentQuestionNumber
 
@@ -66,16 +68,20 @@ class TaskExecutioner(object):
 
     def sendCurrentQuestion(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
+        formattedQuestion = currentQuestion['text'].format(item=self.temporaryAnswer)
+
         if currentQuestion['type'] == 'location':
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
         else:
             replyMarkup = {"remove_keyboard": True}
 
-        bot.send_message(chat_id=update.message.chat_id, text=currentQuestion['text'], reply_markup=replyMarkup, parse_mode='Markdown')
+        bot.send_message(chat_id=update.message.chat_id, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
 
     def sendCurrentQuestionResponse(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
-        bot.send_message(chat_id=update.message.chat_id, text=currentQuestion['responseOk'], parse_mode='Markdown')
+        formattedResponseOk = currentQuestion['responseOk'].format(item=self.temporaryAnswer)
+        replyMarkup = {"remove_keyboard": True}
+        bot.send_message(chat_id=update.message.chat_id, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
 
     def saveTemporaryAnswer(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
@@ -85,6 +91,4 @@ class TaskExecutioner(object):
             self.temporaryAnswer[currentQuestion['property']] = update.message.photo[0].file_id
         elif currentQuestion['type'] == 'location':
             self.temporaryAnswer[currentQuestion['property']] = update.message.location
-
-        print(self.temporaryAnswer)
         

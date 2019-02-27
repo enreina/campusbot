@@ -1,6 +1,7 @@
 from db.task import Task
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler
 from dialoguemanager.response import generalCopywriting
+import db.firestoreClient as FirestoreClient
 
 class TaskExecutioner(object):
     '''Execute a certain task
@@ -9,6 +10,7 @@ class TaskExecutioner(object):
         task: the task data loaded from database
         currentQuestionNumber: the current state (question number) of executing the task
     '''
+    TASK_TYPE_CREATE_ITEM = 0
 
     def __init__(self, taskId):
         self.task = Task.getTaskById(taskId) # load task from db
@@ -19,6 +21,8 @@ class TaskExecutioner(object):
     def initConversationHandler(self):
         # entry points
         def startTask(bot, update):
+            self.currentQuestionNumber = 0
+
             bot.send_message(chat_id=update.message.chat_id, text=self.task.openingStatement, parse_mode='Markdown')
             self.sendCurrentQuestion(bot, update)
 
@@ -37,6 +41,7 @@ class TaskExecutioner(object):
             self.currentQuestionNumber += 1
             if self.currentQuestionNumber >= self.numOfStates:
                 self.currentQuestionNumber = ConversationHandler.END
+                self.saveAnswers()
                 self.sendClosingStatement(bot, update)
             elif self.currentQuestionNumber >= len(self.task.questions):
                 self.sendConfirmation(bot, update)
@@ -46,6 +51,7 @@ class TaskExecutioner(object):
             return self.currentQuestionNumber
 
         def confirmationHandler(bot, update):
+            self.saveAnswers()
             self.sendClosingStatement(bot, update)
 
             return ConversationHandler.END
@@ -108,7 +114,7 @@ class TaskExecutioner(object):
         elif currentQuestion['type'] == 'image':
             self.temporaryAnswer[currentQuestion['property']] = update.message.photo[0].file_id
         elif currentQuestion['type'] == 'location':
-            self.temporaryAnswer[currentQuestion['property']] = update.message.location
+            self.temporaryAnswer[currentQuestion['property']] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.latitude}
         
     def sendConfirmation(self, bot, update):
         for question in self.task.questions:
@@ -122,7 +128,7 @@ class TaskExecutioner(object):
                 elif question['type'] == 'location':
                     location = self.temporaryAnswer[question['property']]
                     bot.send_message(chat_id=update.message.chat_id, text=formattedConfirmation, parse_mode='Markdown')
-                    bot.send_location(chat_id=update.message.chat_id, location=location)
+                    bot.send_location(chat_id=update.message.chat_id, latitude=location['latitude'], longitude=location['longitude'])
         # send is that correct
         replyMarkup = {"keyboard": [[generalCopywriting.YES_BUTTON_TEXT], [generalCopywriting.NO_BUTTON_TEXT]]}
         bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.ASK_DATA_CONFIRMATION_TEXT, reply_markup=replyMarkup, parse_mode='Markdown')
@@ -132,3 +138,10 @@ class TaskExecutioner(object):
         formattedClosingStatement = self.task.closingStatement.format(item=self.temporaryAnswer)
         replyMarkup = {"remove_keyboard": True}
         bot.send_message(chat_id=update.message.chat_id, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
+
+    def saveAnswers(self):
+        if self.task.type == self.TASK_TYPE_CREATE_ITEM: # task type 
+            data = self.temporaryAnswer
+            data['itemType'] = self.task.itemType
+            FirestoreClient.saveDocument('items', data=data)
+

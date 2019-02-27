@@ -31,3 +31,6 @@ def getDocument(collectionName, documentId, populate=False):
         return doc.to_dict()
     except google.cloud.exceptions.NotFound:
         print(u'No such document!')
+
+def saveDocument(collectionName, documentId=None, data={}):
+    db.collection(collectionName).document().set(data)

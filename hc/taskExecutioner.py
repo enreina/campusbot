@@ -65,7 +65,7 @@ class TaskExecutioner(object):
                 handler = MessageHandler(Filters.photo, questionHandler)
             elif question['type'] == 'location':
                 handler = MessageHandler(Filters.location, questionHandler)
-            elif question['type'] == 'text':
+            elif question['type'] in ['text', 'multiple-input']:
                 handler = MessageHandler(Filters.text, questionHandler)
             states[questionNumber] = [handler]
             
@@ -109,18 +109,23 @@ class TaskExecutioner(object):
 
     def saveTemporaryAnswer(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
+        propertyName = currentQuestion['property']
         if currentQuestion['type'] == 'text':
-            self.temporaryAnswer[currentQuestion['property']] = update.message.text
+            self.temporaryAnswer[propertyName] = update.message.text
         elif currentQuestion['type'] == 'image':
-            self.temporaryAnswer[currentQuestion['property']] = update.message.photo[0].file_id
+            self.temporaryAnswer[propertyName] = update.message.photo[0].file_id
         elif currentQuestion['type'] == 'location':
-            self.temporaryAnswer[currentQuestion['property']] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.latitude}
+            self.temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.latitude}
+        elif currentQuestion['type'] == 'multiple-input':
+            splittedAnswers = [x.strip() for x in update.message.text.split(',')]
+            self.temporaryAnswer[propertyName] = update.message.text
+            self.temporaryAnswer[propertyName + '-list'] = splittedAnswers
         
     def sendConfirmation(self, bot, update):
         for question in self.task.questions:
             if 'confirmationText' in question:
                 formattedConfirmation = question['confirmationText'].format(item=self.temporaryAnswer)
-                if question['type'] == 'text':
+                if question['type'] in ['text', 'multiple-input']:
                     bot.send_message(chat_id=update.message.chat_id, text=formattedConfirmation, parse_mode='Markdown')
                 elif question['type'] == 'image':
                     image = self.temporaryAnswer[question['property']]

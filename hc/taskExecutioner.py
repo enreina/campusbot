@@ -1,4 +1,5 @@
 from db.task import Task
+from db.item import Item
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler
 from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
@@ -12,12 +13,15 @@ class TaskExecutioner(object):
         currentQuestionNumber: the current state (question number) of executing the task
     '''
     TASK_TYPE_CREATE_ITEM = 0
+    TASK_TYPE_VALIDATE_ITEM = 1
 
     def __init__(self, taskId):
         self.task = Task.getTaskById(taskId) # load task from db
         self.currentQuestionNumber = 0 # start from opening statement
         self.temporaryAnswer = {}
         self.initConversationHandler()
+        if self.task.type == self.TASK_TYPE_VALIDATE_ITEM:
+            self.initQuestionData()
 
     def initConversationHandler(self):
         # entry points
@@ -66,7 +70,7 @@ class TaskExecutioner(object):
                 handler = MessageHandler(Filters.photo, questionHandler)
             elif question['type'] == 'location':
                 handler = MessageHandler(Filters.location, questionHandler)
-            elif question['type'] in ['text', 'multiple-input', 'location-name']:
+            elif question['type'] in ['text', 'multiple-input', 'location-name', 'image-single-validation']:
                 handler = MessageHandler(Filters.text, questionHandler)
             states[questionNumber] = [handler]
             
@@ -90,10 +94,16 @@ class TaskExecutioner(object):
 
         self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, fallback)])
 
+    def initQuestionData(self):
+        # load items with corresponding itemType
+        self.questionData = Item.getItemsByType(self.task.itemType)[1] # TO-DO assign item here
 
     def sendCurrentQuestion(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
-        formattedQuestion = currentQuestion['text'].format(item=self.temporaryAnswer)
+        if self.task.type == self.TASK_TYPE_CREATE_ITEM:
+            formattedQuestion = currentQuestion['text'].format(item=self.temporaryAnswer)
+        else:
+            formattedQuestion = currentQuestion['text'].format(item=self.questionData)
 
         if currentQuestion['type'] == 'location':
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
@@ -107,10 +117,17 @@ class TaskExecutioner(object):
             for place in nearbyPlaces:
                 keyboardReply.append([place['name']])
             replyMarkup = {"keyboard": keyboardReply}
+        elif currentQuestion['type'] == 'image-single-validation':
+            replyMarkup = {"keyboard": generalCopywriting.VALIDATE_ANSWER_KEYBOARD}
+
         else:
             replyMarkup = {"remove_keyboard": True}
 
-        bot.send_message(chat_id=update.message.chat_id, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
+        
+        if currentQuestion['type'] == 'image-single-validation':
+            bot.send_photo(chat_id=update.message.chat_id, photo=self.questionData['image'], caption=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
+        else:
+            bot.send_message(chat_id=update.message.chat_id, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
 
     def sendCurrentQuestionResponse(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
@@ -151,7 +168,11 @@ class TaskExecutioner(object):
 
 
     def sendClosingStatement(self, bot, update):
-        formattedClosingStatement = self.task.closingStatement.format(item=self.temporaryAnswer)
+        if self.task.type == self.TASK_TYPE_CREATE_ITEM:
+            formattedClosingStatement = self.task.closingStatement.format(item=self.temporaryAnswer)
+        else:
+            formattedClosingStatement = self.task.closingStatement.format(item=self.questionData)
+
         replyMarkup = {"remove_keyboard": True}
         bot.send_message(chat_id=update.message.chat_id, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
 

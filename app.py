@@ -29,6 +29,9 @@ taskExecutionerByChatId = {}
 taskExecutioner = TaskExecutioner('create-place')
 dispatcher.add_handler(taskExecutioner.conversationHandler)
 
+taskExecutioner = TaskExecutioner('validate-place')
+dispatcher.add_handler(taskExecutioner.conversationHandler)
+
 taskExecutioner = TaskExecutioner('create-meal')
 dispatcher.add_handler(taskExecutioner.conversationHandler)
 

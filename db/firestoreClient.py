@@ -34,3 +34,12 @@ def getDocument(collectionName, documentId, populate=False):
 
 def saveDocument(collectionName, documentId=None, data={}, merge=True):
     db.collection(collectionName).document(documentId).set(data, merge=merge)
+
+def getDocuments(collectionName, queries=[]):
+    collectionRef = db.collection(collectionName)
+    for query in queries:
+        collectionRef = collectionRef.where(query[0], query[1], query[2])
+    collectedData = collectionRef.get()
+    documentsAsList = [x.to_dict() for x in collectedData]
+
+    return documentsAsList

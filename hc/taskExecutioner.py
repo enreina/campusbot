@@ -2,6 +2,7 @@ from db.task import Task
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler
 from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
+from utility.placeUtility import findNearestPlaceItem
 
 class TaskExecutioner(object):
     '''Execute a certain task
@@ -65,7 +66,7 @@ class TaskExecutioner(object):
                 handler = MessageHandler(Filters.photo, questionHandler)
             elif question['type'] == 'location':
                 handler = MessageHandler(Filters.location, questionHandler)
-            elif question['type'] in ['text', 'multiple-input']:
+            elif question['type'] in ['text', 'multiple-input', 'location-name']:
                 handler = MessageHandler(Filters.text, questionHandler)
             states[questionNumber] = [handler]
             
@@ -96,6 +97,16 @@ class TaskExecutioner(object):
 
         if currentQuestion['type'] == 'location':
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
+        elif currentQuestion['type'] == 'location-name':
+            locationAnswer = self.temporaryAnswer['location']
+            # find nearby places
+            nearbyPlaces = findNearestPlaceItem(locationAnswer['latitude'], locationAnswer['longitude'])
+            print(nearbyPlaces)
+            # construct keyboard for reply
+            keyboardReply = []
+            for place in nearbyPlaces:
+                keyboardReply.append([place['name']])
+            replyMarkup = {"keyboard": keyboardReply}
         else:
             replyMarkup = {"remove_keyboard": True}
 
@@ -110,12 +121,12 @@ class TaskExecutioner(object):
     def saveTemporaryAnswer(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
         propertyName = currentQuestion['property']
-        if currentQuestion['type'] == 'text':
+        if currentQuestion['type'] in ['text', 'location-name']:
             self.temporaryAnswer[propertyName] = update.message.text
         elif currentQuestion['type'] == 'image':
             self.temporaryAnswer[propertyName] = update.message.photo[0].file_id
         elif currentQuestion['type'] == 'location':
-            self.temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.latitude}
+            self.temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}
         elif currentQuestion['type'] == 'multiple-input':
             splittedAnswers = [x.strip() for x in update.message.text.split(',')]
             self.temporaryAnswer[propertyName] = update.message.text
@@ -125,7 +136,7 @@ class TaskExecutioner(object):
         for question in self.task.questions:
             if 'confirmationText' in question:
                 formattedConfirmation = question['confirmationText'].format(item=self.temporaryAnswer)
-                if question['type'] in ['text', 'multiple-input']:
+                if question['type'] in ['text', 'multiple-input', 'location-name']:
                     bot.send_message(chat_id=update.message.chat_id, text=formattedConfirmation, parse_mode='Markdown')
                 elif question['type'] == 'image':
                     image = self.temporaryAnswer[question['property']]

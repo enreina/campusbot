@@ -6,6 +6,8 @@ from hc.taskExecutioner import TaskExecutioner
 # taskExecutioner = TaskExecutioner('create-place')
 # taskExecutioner.startTask()
 
+
+
 # create-meal task
 FirestoreClient.saveDocument('tasks', 'create-meal', 
     {   'openingStatement': u'Let\'s create a meal item',
@@ -25,7 +27,7 @@ FirestoreClient.saveDocument('tasks', 'create-meal',
             {
                 'text': u'What is the name of each food in the photo?\n\nYou can tell me multiple food separated with commas\nExample: fried egg, bread, milk',
                 'property': u'name',
-                'type': u'text',
+                'type': u'multiple-input',
                 'responseOk': u'*{item[name]}*, huh? Looks delicious!',
                 'responseError': u'Sorry, I couldn\'t quite get that'
             },
@@ -35,7 +37,7 @@ FirestoreClient.saveDocument('tasks', 'create-meal',
                 'type': u'text',
                 'responseOk': u'Good to know!',
                 'responseError': u'Sorry, I couldn\'t quite get that',
-                'confirmationText': 'The price of the meal is *{item[price]}*'
+                'confirmationText': u'The price of the meal is *{item[price]}*'
             },
             {
                 'text': u'Where did you buy the meal?\n\nYou can send me your location or a custom location.',
@@ -43,7 +45,22 @@ FirestoreClient.saveDocument('tasks', 'create-meal',
                 'type': u'location',
                 'responseOk': u'Good to know!',
                 'responseError': u'Sorry, I couldn\'t quite get that',
-                'confirmationText': 'This is where you bought the meal:'
+                'confirmationText': u'This is where you bought the meal: *{item[location-name]}*'
+            },
+            {
+                'text': u'What is the name of the place?\n\nYou can select the following suggestions or type in any other name of the place',
+                'property': u'location-name',
+                'type': u'location-name',
+                'responseOk': u'Good to know!',
+                'responseError': u'Sorry, I couldn\'t quite get that',
+            },
+            {
+                'text': u'From scale from 1-5, how do you rate the meal?',
+                'property': u'rating',
+                'type': u'text',
+                'responseOk': u'Good to know!',
+                'responseError': u'Sorry, I couldn\'t quite get that',
+                'confirmationText': u'You rate the meal with *{item[rating]}*'
             }
         ]
     })

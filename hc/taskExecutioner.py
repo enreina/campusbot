@@ -4,7 +4,9 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
-from utility.placeUtility import findNearestPlaceItem
+from common.placeUtility import findNearestPlaceItem
+from common.constants import taskType
+from common.constants import questionType
 
 class TaskExecutioner(object):
     '''Execute a certain task
@@ -13,15 +15,13 @@ class TaskExecutioner(object):
         task: the task data loaded from database
         currentQuestionNumber: the current state (question number) of executing the task
     '''
-    TASK_TYPE_CREATE_ITEM = 0
-    TASK_TYPE_VALIDATE_ITEM = 1
 
     def __init__(self, taskId):
         self.task = Task.getTaskById(taskId) # load task from db
         self.currentQuestionNumber = 0 # start from opening statement
         self.temporaryAnswer = {}
         self.initConversationHandler()
-        if self.task.type == self.TASK_TYPE_VALIDATE_ITEM:
+        if self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM:
             self.initQuestionData()
 
     def initConversationHandler(self):
@@ -30,7 +30,7 @@ class TaskExecutioner(object):
             self.currentQuestionNumber = 0
 
             bot.send_message(chat_id=update.message.chat_id, text=self.task.openingStatement, parse_mode='Markdown')
-            if self.task.type == self.TASK_TYPE_VALIDATE_ITEM and 'image' in self.questionData:
+            if self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM and 'image' in self.questionData:
                 bot.send_photo(chat_id=update.message.chat_id, photo=self.questionData['image'], parse_mode='Markdown')
             self.sendCurrentQuestion(bot, update)
 
@@ -69,13 +69,13 @@ class TaskExecutioner(object):
 
         for questionNumber, question in enumerate(self.task.questions):
             # create handler
-            if question['type'] == 'image':
+            if question['type'] == questionType.QUESTION_TYPE_IMAGE:
                 handler = MessageHandler(Filters.photo, questionHandler)
-            elif question['type'] == 'location':
+            elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
                 handler = MessageHandler(Filters.location, questionHandler)
-            elif question['type'] in ['text', 'multiple-input', 'location-name']:
+            elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
                 handler = MessageHandler(Filters.text, questionHandler)
-            elif question['type'].startswith('single-validation'):
+            elif question['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
                 handler = CallbackQueryHandler(questionHandler)
             states[questionNumber] = [handler]
             
@@ -110,14 +110,14 @@ class TaskExecutioner(object):
             chatId = update.message.chat_id
 
         currentQuestion = self.task.questions[self.currentQuestionNumber]
-        if self.task.type == self.TASK_TYPE_CREATE_ITEM:
+        if self.task.type == taskType.TASK_TYPE_CREATE_ITEM:
             formattedQuestion = currentQuestion['text'].format(item=self.temporaryAnswer)
         else:
             formattedQuestion = currentQuestion['text'].format(item=self.questionData)
 
-        if currentQuestion['type'] == 'location':
+        if currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
-        elif currentQuestion['type'] == 'location-name':
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION_NAME:
             locationAnswer = self.temporaryAnswer['location']
             # find nearby places
             nearbyPlaces = findNearestPlaceItem(locationAnswer['latitude'], locationAnswer['longitude'])
@@ -127,7 +127,7 @@ class TaskExecutioner(object):
             for place in nearbyPlaces:
                 keyboardReply.append([place['name']])
             replyMarkup = {"keyboard": keyboardReply}
-        elif currentQuestion['type'].startswith('single-validation'):
+        elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data='0'),
                         InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NO_TEXT, callback_data='1')],
                         [InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data='2')]]
@@ -135,7 +135,7 @@ class TaskExecutioner(object):
         else:
             replyMarkup = {"remove_keyboard": True}
         
-        if currentQuestion['type'] == 'single-validation-location':
+        if currentQuestion['type'] == questionType.QUESTION_TYPE_SINGLE_VALIDATION_LOCATION:
             bot.send_location(chat_id=chatId, latitude=self.questionData['location']['latitude'], longitude=self.questionData['location']['longitude'])
         bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
 
@@ -152,20 +152,18 @@ class TaskExecutioner(object):
     def saveTemporaryAnswer(self, bot, update):
         currentQuestion = self.task.questions[self.currentQuestionNumber]
         propertyName = currentQuestion['property']
-        if currentQuestion['type'] in ['text', 'location-name']:
+        if currentQuestion['type'] in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
             self.temporaryAnswer[propertyName] = update.message.text
-        elif currentQuestion['type'] == 'image':
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_IMAGE:
             self.temporaryAnswer[propertyName] = update.message.photo[0].file_id
-        elif currentQuestion['type'] == 'location':
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             self.temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}
-        elif currentQuestion['type'] == 'multiple-input':
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_INPUT:
             splittedAnswers = [x.strip() for x in update.message.text.split(',')]
             self.temporaryAnswer[propertyName] = update.message.text
             self.temporaryAnswer[propertyName + '-list'] = splittedAnswers
-        elif currentQuestion['type'].startswith('single-validation'):
+        elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             self.temporaryAnswer[propertyName] = update.callback_query.data
-
-        print(self.temporaryAnswer)
         
     def sendConfirmation(self, bot, update):
         if update.callback_query:
@@ -176,15 +174,16 @@ class TaskExecutioner(object):
         for question in self.task.questions:
             if 'confirmationText' in question:
                 formattedConfirmation = question['confirmationText'].format(item=self.temporaryAnswer)
-                if question['type'] in ['text', 'multiple-input', 'location-name']:
+                if question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
                     bot.send_message(chat_id=chatId, text=formattedConfirmation, parse_mode='Markdown')
-                elif question['type'] == 'image':
+                elif question['type'] == questionType.QUESTION_TYPE_IMAGE:
                     image = self.temporaryAnswer[question['property']]
                     bot.send_photo(chat_id=chatId, photo=image, caption=formattedConfirmation, parse_mode='Markdown')
-                elif question['type'] == 'location':
+                elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
                     location = self.temporaryAnswer[question['property']]
                     bot.send_message(chat_id=chatId, text=formattedConfirmation, parse_mode='Markdown')
                     bot.send_location(chat_id=chatId, latitude=location['latitude'], longitude=location['longitude'])
+
         # send is that correct
         replyMarkup = {"keyboard": [[generalCopywriting.YES_BUTTON_TEXT], [generalCopywriting.NO_BUTTON_TEXT]]}
         bot.send_message(chat_id=chatId, text=generalCopywriting.ASK_DATA_CONFIRMATION_TEXT, reply_markup=replyMarkup, parse_mode='Markdown')
@@ -196,7 +195,7 @@ class TaskExecutioner(object):
         else:
             chatId = update.message.chat_id
 
-        if self.task.type == self.TASK_TYPE_CREATE_ITEM:
+        if self.task.type == taskType.TASK_TYPE_CREATE_ITEM:
             formattedClosingStatement = self.task.closingStatement.format(item=self.temporaryAnswer)
         else:
             formattedClosingStatement = self.task.closingStatement.format(item=self.questionData)
@@ -205,11 +204,11 @@ class TaskExecutioner(object):
         bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
 
     def saveAnswers(self):
-        if self.task.type == self.TASK_TYPE_CREATE_ITEM: # task type 
+        if self.task.type == taskType.TASK_TYPE_CREATE_ITEM: # task type 
             data = self.temporaryAnswer
             data['itemType'] = self.task.itemType
             FirestoreClient.saveDocument('items', data=data)
-        elif self.task.type == self.TASK_TYPE_VALIDATE_ITEM:
+        elif self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM:
             validations = []
             for question in self.task.questions:
                 validations.append({

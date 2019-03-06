@@ -2,7 +2,8 @@
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
-from google.cloud.firestore_v1beta1.document import DocumentReference
+from google.cloud.firestore_v1beta1.document import DocumentReference 
+from google.cloud.firestore_v1beta1 import ArrayUnion
 import settings as env
 
 cred = credentials.Certificate(env.FIRESTORE_SERVICE_ACCOUNT_PATH)
@@ -28,18 +29,30 @@ def getDocument(collectionName, documentId, populate=False):
 
     try:
         doc = doc_ref.get()
-        return doc.to_dict()
+        documentDictionary = doc.to_dict()
+        documentDictionary['_id'] = doc.id
+        return documentDictionary
     except google.cloud.exceptions.NotFound:
         print(u'No such document!')
 
 def saveDocument(collectionName, documentId=None, data={}, merge=True):
     db.collection(collectionName).document(documentId).set(data, merge=merge)
 
+def updateDocument(collectionName, documentId, data):
+    db.collection(collectionName).document(documentId).update(data)
+
+def updateArrayInDocument(collectionName, documentId, arrayProperty, newArray):
+    updateDocument(collectionName, documentId, {arrayProperty: ArrayUnion(newArray)})
+
 def getDocuments(collectionName, queries=[]):
     collectionRef = db.collection(collectionName)
     for query in queries:
         collectionRef = collectionRef.where(query[0], query[1], query[2])
     collectedData = collectionRef.get()
-    documentsAsList = [x.to_dict() for x in collectedData]
-
+    documentsAsList = []
+    for item in collectedData:
+        itemAsDict = item.to_dict()
+        itemAsDict['_id'] = item.id
+        documentsAsList.append(itemAsDict)
+   
     return documentsAsList

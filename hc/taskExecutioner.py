@@ -209,3 +209,13 @@ class TaskExecutioner(object):
             data = self.temporaryAnswer
             data['itemType'] = self.task.itemType
             FirestoreClient.saveDocument('items', data=data)
+        elif self.task.type == self.TASK_TYPE_VALIDATE_ITEM:
+            validations = []
+            for question in self.task.questions:
+                validations.append({
+                    'propertyName': question['property'],
+                    'propertyValue': self.questionData[question['property']],
+                    'validation': self.temporaryAnswer[question['property']]
+                })
+            FirestoreClient.updateArrayInDocument('items', self.questionData['_id'], 'validations', validations)
+            

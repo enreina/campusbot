@@ -4,27 +4,18 @@ import settings as env
 from dialoguemanager.response import generalCopywriting
 from hc.taskExecutioner import TaskExecutioner
 
-updater = Updater(token=env.TELEGRAM_BOT_TOKEN)
+updater = Updater(token=env.TELEGRAM_BOT_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
 
 ## command handlers
-def start(bot, update):
-    bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.WELCOME_MESSAGE, parse_mode='Markdown')
+def start(update, context):
+    context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.WELCOME_MESSAGE, parse_mode='Markdown')
                 
 start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)
-
-taskExecutionerByChatId = {}
-
-# def place_handler_wrapper(bot, update):
-#     chatId = update.message.chat_id
-#     if chatId not in taskExecutionerByChatId:
-#         taskExecutionerByChatId[chatId] = TaskExecutioner('create-place', bot, update)
-#     taskExecutioner = taskExecutionerByChatId[chatId]
-#     taskExecutioner.startTask()
 
 taskExecutioner = TaskExecutioner('create-place')
 dispatcher.add_handler(taskExecutioner.conversationHandler)

@@ -8,6 +8,7 @@ from common.placeUtility import findNearestPlaceItem
 from common.constants import taskType
 from common.constants import questionType
 from client.telegramClient import dispatcher
+from pprint import pprint
 
 class TaskExecutioner(object):
     '''Execute a certain task
@@ -19,105 +20,58 @@ class TaskExecutioner(object):
 
     def __init__(self, taskId):
         self.task = Task.getTaskById(taskId) # load task from db
-        self.currentQuestionNumber = 0 # start from opening statement
         self.initConversationHandler()
         if self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM:
             self.initQuestionData()
-        
 
     def initConversationHandler(self):
         # entry points
-        def startTask(bot, update, chat_data):
-            chat_data['userId'] = update.message.from_user.id
-            chat_data['temporaryAnswer'] = {}
-            chat_data['chatId'] = update.message.chat_id
-
-            self.currentQuestionNumber = 0
-
-            bot.send_message(chat_id=update.message.chat_id, text=self.task.openingStatement, parse_mode='Markdown')
-            if self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM and 'image' in self.questionData:
-                bot.send_photo(chat_id=update.message.chat_id, photo=self.questionData['image'], parse_mode='Markdown')
-            self.sendCurrentQuestion(bot, update, chat_data)
-
-            return self.currentQuestionNumber
-
-        entryPoints = [CommandHandler(self.task.entryCommand, startTask, pass_chat_data=True)]
-
-        # individual state handler
-        def questionHandler(bot, update, chat_data):
-            # save to temporary answer
-            self.saveTemporaryAnswer(bot, update, chat_data)
-            # send response of current question
-            self.sendCurrentQuestionResponse(bot, update, chat_data)
-
-            # move to next question
-            self.currentQuestionNumber += 1
-            if self.currentQuestionNumber >= self.numOfStates:
-                self.currentQuestionNumber = ConversationHandler.END
-                self.saveAnswers(chat_data)
-                self.sendClosingStatement(bot, update, chat_data)
-            elif self.currentQuestionNumber >= len(self.task.questions):
-                self.sendConfirmation(bot, update, chat_data)
-            else:
-                self.sendCurrentQuestion(bot, update, chat_data)
-
-            return self.currentQuestionNumber
-
-        def confirmationHandler(bot, update, chat_data):
-            self.saveAnswers(chat_data)
-            self.sendClosingStatement(bot, update, chat_data)
-
-            return ConversationHandler.END
-
+        entryPoints = [CommandHandler(self.task.entryCommand, self._startTaskCallback)]
+        # create states
         states = {}
         hasConfirmation = False
 
         for questionNumber, question in enumerate(self.task.questions):
             # create handler
             if question['type'] == questionType.QUESTION_TYPE_IMAGE:
-                handler = MessageHandler(Filters.photo, questionHandler, pass_chat_data=True)
+                handler = MessageHandler(Filters.photo, self._questionCallback)
             elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
-                handler = MessageHandler(Filters.location, questionHandler, pass_chat_data=True)
+                handler = MessageHandler(Filters.location, self._questionCallback)
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
-                handler = MessageHandler(Filters.text, questionHandler, pass_chat_data=True)
+                handler = MessageHandler(Filters.text, self._questionCallback)
             elif question['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
-                handler = CallbackQueryHandler(questionHandler, pass_chat_data=True)
+                handler = CallbackQueryHandler(self._questionCallback)
             states[questionNumber] = [handler]
             
             if 'confirmationText' in question: 
                 hasConfirmation = True
 
         if hasConfirmation:
-            states[len(self.task.questions)] = [MessageHandler(Filters.text, confirmationHandler, pass_chat_data=True)]
+            states[len(self.task.questions)] = [MessageHandler(Filters.text, self._confirmationCallback)]
             self.numOfStates = len(self.task.questions) + 1
         else:
             self.numOfStates = len(self.task.questions)
-        
 
-        # fallback
-        def fallback(bot, update, chat_data):
-            temporaryAnswer = chat_data['temporaryAnswer']
-            currentQuestion = self.task.questions[self.currentQuestionNumber]
-            formattedResponseError = currentQuestion['responseError'].format(item=temporaryAnswer)
-            bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
-
-            return self.currentQuestionNumber
-
-        self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, fallback, pass_chat_data=True)])
+        self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)])
 
     def initQuestionData(self):
         # load items with corresponding itemType
-        self.questionData = Item.getItemsByType(self.task.itemType)[0] # TO-DO assign item here
+        self.questionData = Item.getItemsByType(self.task.itemType)[-1] # TO-DO assign item here
 
-    def sendCurrentQuestion(self, bot, update, chat_data):
-        temporaryAnswer = chat_data['temporaryAnswer']
+    def sendCurrentQuestion(self, update, context):
+        bot = context.bot
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+        if 'currentQuestionNumber' in context.chat_data:
+            currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        else:
+            currentQuestionNumber = 0
 
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
         else:
             chatId = update.message.chat_id
 
-        currentQuestion = self.task.questions[self.currentQuestionNumber]
+        currentQuestion = self.task.questions[currentQuestionNumber]
         if self.task.type == taskType.TASK_TYPE_CREATE_ITEM:
             formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
         else:
@@ -147,20 +101,24 @@ class TaskExecutioner(object):
             bot.send_location(chat_id=chatId, latitude=self.questionData['location']['latitude'], longitude=self.questionData['location']['longitude'])
         bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
 
-    def sendCurrentQuestionResponse(self, bot, update, chat_data):
-        temporaryAnswer = chat_data['temporaryAnswer']
+    def sendCurrentQuestionResponse(self, update, context):
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+        currentQuestionNumber = context.chat_data['currentQuestionNumber']
+
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
         else:
             chatId = update.message.chat_id
-        currentQuestion = self.task.questions[self.currentQuestionNumber]
+        currentQuestion = self.task.questions[currentQuestionNumber]
         formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
         replyMarkup = {"remove_keyboard": True}
-        bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
+        context.bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
 
-    def saveTemporaryAnswer(self, bot, update, chat_data):
-        temporaryAnswer = chat_data['temporaryAnswer']
-        currentQuestion = self.task.questions[self.currentQuestionNumber]
+    def saveTemporaryAnswer(self, update, context):
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+        currentQuestionNumber = context.chat_data['currentQuestionNumber']
+
+        currentQuestion = self.task.questions[currentQuestionNumber]
         propertyName = currentQuestion['property']
         if currentQuestion['type'] in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
             temporaryAnswer[propertyName] = update.message.text
@@ -175,8 +133,9 @@ class TaskExecutioner(object):
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             temporaryAnswer[propertyName] = update.callback_query.data
         
-    def sendConfirmation(self, bot, update, chat_data):
-        temporaryAnswer = chat_data['temporaryAnswer']
+    def sendConfirmation(self, update, context):
+        bot = context.bot
+        temporaryAnswer = context.chat_data['temporaryAnswer']
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
         else:
@@ -200,8 +159,8 @@ class TaskExecutioner(object):
         bot.send_message(chat_id=chatId, text=generalCopywriting.ASK_DATA_CONFIRMATION_TEXT, reply_markup=replyMarkup, parse_mode='Markdown')
 
 
-    def sendClosingStatement(self, bot, update, chat_data):
-        temporaryAnswer = chat_data['temporaryAnswer']
+    def sendClosingStatement(self, update, context):
+        temporaryAnswer = context.chat_data['temporaryAnswer']
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
         else:
@@ -213,7 +172,7 @@ class TaskExecutioner(object):
             formattedClosingStatement = self.task.closingStatement.format(item=self.questionData)
 
         replyMarkup = {"remove_keyboard": True}
-        bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
+        context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
 
     def saveAnswers(self, chat_data):
         temporaryAnswer = chat_data['temporaryAnswer']
@@ -233,3 +192,57 @@ class TaskExecutioner(object):
                 })
             FirestoreClient.updateArrayInDocument('items', self.questionData['_id'], 'validations', validations)
             
+    # callbacks
+    def _startTaskCallback(self, update, context):
+        bot = context.bot
+        context.chat_data['userId'] = update.message.from_user.id
+        context.chat_data['temporaryAnswer'] = {}
+        context.chat_data['chatId'] = update.message.chat_id
+        context.chat_data['currentQuestionNumber'] = 0
+
+        bot.send_message(chat_id=update.message.chat_id, text=self.task.openingStatement, parse_mode='Markdown')
+        if self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM and 'image' in self.questionData:
+            bot.send_photo(chat_id=update.message.chat_id, photo=self.questionData['image'], parse_mode='Markdown')
+        self.sendCurrentQuestion(update, context)
+
+        return context.chat_data['currentQuestionNumber']
+
+    # individual state callback
+    def _questionCallback(self, update, context):
+        # save to temporary answer
+        self.saveTemporaryAnswer(update, context)
+        # send response of current question
+        self.sendCurrentQuestionResponse(update, context)
+
+        # update question number in context
+        currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        # move to next question
+        currentQuestionNumber += 1
+        context.chat_data['currentQuestionNumber'] = currentQuestionNumber
+        if currentQuestionNumber >= self.numOfStates:
+            currentQuestionNumber = ConversationHandler.END
+            self.saveAnswers(context.chat_data)
+            self.sendClosingStatement(update, context)
+        elif currentQuestionNumber >= len(self.task.questions):
+            self.sendConfirmation(update, context)
+        else:
+            self.sendCurrentQuestion(update, context)
+
+        return currentQuestionNumber
+
+    def _confirmationCallback(self, update, context):
+        self.saveAnswers(context.chat_data)
+        self.sendClosingStatement(update, context)
+
+        return ConversationHandler.END
+
+    # fallback
+    def _fallbackCallback(self, update, context):
+        currentQuestionNumber = context.chat_data['currentQuestionNumber']
+
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+        currentQuestion = self.task.questions[currentQuestionNumber]
+        formattedResponseError = currentQuestion['responseError'].format(item=temporaryAnswer)
+        context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
+
+        return currentQuestionNumber

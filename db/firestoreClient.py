@@ -5,6 +5,7 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1beta1.document import DocumentReference 
 from google.cloud.firestore_v1beta1 import ArrayUnion
 import settings as env
+from bunch import Bunch
 
 cred = credentials.Certificate(env.FIRESTORE_SERVICE_ACCOUNT_PATH)
 firebase_admin.initialize_app(cred)
@@ -53,6 +54,6 @@ def getDocuments(collectionName, queries=[]):
     for item in collectedData:
         itemAsDict = item.to_dict()
         itemAsDict['_id'] = item.id
-        documentsAsList.append(itemAsDict)
+        documentsAsList.append(Bunch(itemAsDict))
    
     return documentsAsList

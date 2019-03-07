@@ -1,0 +1,1 @@
+ITEM_SELECTION_STATE = 'item_selection_state'

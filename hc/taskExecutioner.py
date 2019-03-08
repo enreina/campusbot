@@ -5,7 +5,7 @@ from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHa
 from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
 from common.placeUtility import findNearestPlaceItem
-from common.constants import taskType, questionType, specialStates
+from common.constants import taskType, questionType, specialStates, callbackTypes
 from client.telegramClient import dispatcher
 from pprint import pprint
 import re
@@ -20,8 +20,8 @@ class TaskExecutioner(object):
 
     def __init__(self, taskId):
         self.task = Task.getTaskById(taskId) # load task from db
-        if self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM:
-            self.initAvailableTasks()
+        if self.task.type in taskType.TASK_TYPES_WITH_SELECTING_ITEMS:
+            self.initAvailableItems()
         self.initConversationHandler()
 
     def initConversationHandler(self):
@@ -31,7 +31,7 @@ class TaskExecutioner(object):
         states = {}
         hasConfirmation = False
 
-        if 'selectTaskStatements' in self.task:
+        if 'selectItemStatements' in self.task:
             states[specialStates.ITEM_SELECTION_STATE] = [self.createTaskSelectionHandler()]
 
         for questionNumber, question in enumerate(self.task.questions):
@@ -42,7 +42,7 @@ class TaskExecutioner(object):
                 handler = MessageHandler(Filters.location, self._questionCallback)
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
                 handler = MessageHandler(Filters.text, self._questionCallback)
-            elif question['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
+            elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
                 handler = CallbackQueryHandler(self._questionCallback)
             states[questionNumber] = [handler]
             
@@ -57,7 +57,7 @@ class TaskExecutioner(object):
 
         self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)])
 
-    def initAvailableTasks(self):
+    def initAvailableItems(self):
         # load items with corresponding itemType
         self.availableItems = Item.getItemsByType(self.task.itemType)
 
@@ -94,10 +94,23 @@ class TaskExecutioner(object):
                 keyboardReply.append([place['name']])
             replyMarkup = {"keyboard": keyboardReply}
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
-            keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data='0'),
-                        InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NO_TEXT, callback_data='1')],
-                        [InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data='2')]]
+            keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_YES),
+                        InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NO_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_NO)],
+                        [InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_NOT_SURE)]]
             replyMarkup = InlineKeyboardMarkup(keyboard)
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
+            # load subtypes
+            if 'itemType' in temporaryAnswer:
+                itemType = temporaryAnswer['itemType']
+            else: 
+                itemType =  selectedItem['itemType']
+            subtypes = Item.getSubtypes(itemType)
+            # build inline button
+            keyboardItems = []
+            for subtype in subtypes:
+                keyboardItems.append([InlineKeyboardButton(subtype['name'], callback_data=subtype['_id'])])
+            keyboardItems.append([InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)])
+            replyMarkup = InlineKeyboardMarkup(keyboardItems)
         else:
             replyMarkup = {"remove_keyboard": True}
         
@@ -114,14 +127,16 @@ class TaskExecutioner(object):
         else:
             chatId = update.message.chat_id
         currentQuestion = self.task.questions[currentQuestionNumber]
-        formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
+        if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION and temporaryAnswer['itemType'] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+            formattedResponseOk = currentQuestion['responseNotSure']
+        else: 
+            formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
         replyMarkup = {"remove_keyboard": True}
         context.bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
 
     def saveTemporaryAnswer(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
-
         currentQuestion = self.task.questions[currentQuestionNumber]
         propertyName = currentQuestion['property']
         if currentQuestion['type'] in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
@@ -136,6 +151,13 @@ class TaskExecutioner(object):
             temporaryAnswer[propertyName + '-list'] = splittedAnswers
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             temporaryAnswer[propertyName] = update.callback_query.data
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
+            callbackData = update.callback_query.data
+            if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+                subtype = Item.getItemById(callbackData)
+                temporaryAnswer[propertyName] = subtype
+            else:
+                temporaryAnswer[propertyName] = callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE
         
     def sendConfirmation(self, update, context):
         bot = context.bot
@@ -197,6 +219,18 @@ class TaskExecutioner(object):
                     'userId': chat_data['userId']
                 })
             FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'validations', validations)
+        elif self.task.type == taskType.TASK_TYPE_CATEGORIZE_ITEM:
+            categorizations = []
+            selectedItem = chat_data['selectedItem']
+            if temporaryAnswer['itemType'] != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+                answer = temporaryAnswer['itemType']['_ref']
+            else:
+                answer = None
+            categorizations.append({
+                'propertyName': u'itemType',
+                'propertyValue': answer,
+                'userId': chat_data['userId']})
+            FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'categorizations', categorizations)
             
     def createTaskSelectionHandler(self):
         return MessageHandler(Filters.regex('(\d+)'), self._selectTaskItemCallback)
@@ -204,8 +238,8 @@ class TaskExecutioner(object):
     def sendItemSelectionMessages(self, update, context):
         bot = context.bot
 
-        openingStatement = self.task.selectTaskStatements['openingStatement']
-        taskStatement = self.task.selectTaskStatements['taskStatement']
+        openingStatement = self.task.selectItemStatements['openingStatement']
+        taskStatement = self.task.selectItemStatements['taskStatement']
 
         bot.send_message(chat_id=update.message.chat_id, text=openingStatement, parse_mode='Markdown')
         # send available task item
@@ -222,7 +256,7 @@ class TaskExecutioner(object):
 
         bot.send_message(chat_id=update.message.chat_id, text=self.task.openingStatement, parse_mode='Markdown')
         
-        if 'selectTaskStatements' in self.task:
+        if 'selectItemStatements' in self.task:
             self.sendItemSelectionMessages(update, context)
             context.chat_data['isSelectingItem'] = True
             return specialStates.ITEM_SELECTION_STATE
@@ -235,7 +269,7 @@ class TaskExecutioner(object):
         # get number
         selectedNumber = int(re.search('(\d+)',update.message.text).group(0))
         if selectedNumber > len(self.availableItems):
-            bot.send_message(chat_id=update.message.chat_id, text=self.task.selectTaskStatements['responseError'])
+            bot.send_message(chat_id=update.message.chat_id, text=self.task.selectItemStatements['responseError'])
             return specialStates.ITEM_SELECTION_STATE
         else:
             context.chat_data['isSelectingItem'] = False
@@ -280,7 +314,7 @@ class TaskExecutioner(object):
     # fallback
     def _fallbackCallback(self, update, context):
         if context.chat_data['isSelectingItem']:
-            formattedResponseError = self.task.selectTaskStatements['responseError']
+            formattedResponseError = self.task.selectItemStatements['responseError']
             context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
             return specialStates.ITEM_SELECTION_STATE
 

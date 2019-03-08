@@ -25,13 +25,15 @@ def getCollection(collectionName, populate=False):
 
     return documentsAsList
 
-def getDocument(collectionName, documentId, populate=False):
+def getDocument(collectionName, documentId, populate=False, withRef=False):
     doc_ref = db.collection(collectionName).document(documentId)
 
     try:
         doc = doc_ref.get()
         documentDictionary = doc.to_dict()
         documentDictionary['_id'] = doc.id
+        if withRef:
+            documentDictionary['_ref'] = doc_ref
         return documentDictionary
     except google.cloud.exceptions.NotFound:
         print(u'No such document!')
@@ -45,7 +47,7 @@ def updateDocument(collectionName, documentId, data):
 def updateArrayInDocument(collectionName, documentId, arrayProperty, newArray):
     updateDocument(collectionName, documentId, {arrayProperty: ArrayUnion(newArray)})
 
-def getDocuments(collectionName, queries=[]):
+def getDocuments(collectionName, queries=[], withRef=False):
     collectionRef = db.collection(collectionName)
     for query in queries:
         collectionRef = collectionRef.where(query[0], query[1], query[2])
@@ -54,6 +56,8 @@ def getDocuments(collectionName, queries=[]):
     for item in collectedData:
         itemAsDict = item.to_dict()
         itemAsDict['_id'] = item.id
+        if withRef:
+            itemAsDict['_ref'] = item
         documentsAsList.append(Bunch(itemAsDict))
    
     return documentsAsList

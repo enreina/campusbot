@@ -282,7 +282,7 @@ class TaskExecutioner(object):
             context.chat_data['isSelectingItem'] = False
             selectedItem = self.availableItems[selectedNumber-1]
             context.chat_data['selectedItem'] = selectedItem
-            if self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM and 'image' in selectedItem:
+            if self.task.type in taskType.TASK_TYPES_WITH_SELECTING_ITEMS and 'image' in selectedItem:
                 bot.send_photo(chat_id=update.message.chat_id, photo=selectedItem.image, parse_mode='Markdown')
             self.sendCurrentQuestion(update, context)
             

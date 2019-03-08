@@ -101,9 +101,9 @@ class TaskExecutioner(object):
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
             # load subtypes
             if 'itemType' in temporaryAnswer:
-                itemType = temporaryAnswer['itemType']
+                itemType = temporaryAnswer['itemType'][-1]['_ref']
             else: 
-                itemType =  selectedItem['itemType']
+                itemType = selectedItem['itemType']
             subtypes = Item.getSubtypes(itemType)
             # build inline button
             keyboardItems = []
@@ -127,8 +127,11 @@ class TaskExecutioner(object):
         else:
             chatId = update.message.chat_id
         currentQuestion = self.task.questions[currentQuestionNumber]
-        if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION and temporaryAnswer['itemType'] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
-            formattedResponseOk = currentQuestion['responseNotSure']
+        if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
+            if temporaryAnswer['itemType'][-1] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+                formattedResponseOk = currentQuestion['responseNotSure']
+            else:
+                formattedResponseOk = currentQuestion['responseOk'].format(itemType=temporaryAnswer['itemType'][-1])
         else: 
             formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
         replyMarkup = {"remove_keyboard": True}
@@ -153,11 +156,13 @@ class TaskExecutioner(object):
             temporaryAnswer[propertyName] = update.callback_query.data
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
             callbackData = update.callback_query.data
+            if propertyName not in temporaryAnswer:
+                temporaryAnswer[propertyName] = []
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subtype = Item.getItemById(callbackData)
-                temporaryAnswer[propertyName] = subtype
+                temporaryAnswer[propertyName].append(subtype)
             else:
-                temporaryAnswer[propertyName] = callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE
+                temporaryAnswer[propertyName].append(callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)
         
     def sendConfirmation(self, update, context):
         bot = context.bot
@@ -222,13 +227,15 @@ class TaskExecutioner(object):
         elif self.task.type == taskType.TASK_TYPE_CATEGORIZE_ITEM:
             categorizations = []
             selectedItem = chat_data['selectedItem']
-            if temporaryAnswer['itemType'] != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
-                answer = temporaryAnswer['itemType']['_ref']
-            else:
-                answer = None
+            answers = []
+            for itemType in temporaryAnswer['itemType']:
+                if itemType != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+                    answers.append(itemType['_ref'])
+                else:
+                    answers.append(None)
             categorizations.append({
                 'propertyName': u'itemType',
-                'propertyValue': answer,
+                'propertyValue': answers,
                 'userId': chat_data['userId']})
             FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'categorizations', categorizations)
             
@@ -281,7 +288,15 @@ class TaskExecutioner(object):
             
             return context.chat_data['currentQuestionNumber']
         
-
+    def hasMoreSubtypes(self, update, context):
+        if self.task.type == taskType.TASK_TYPE_CATEGORIZE_ITEM:
+            temporaryAnswer = context.chat_data['temporaryAnswer']
+            if 'itemType' in temporaryAnswer:
+                if temporaryAnswer['itemType'][-1] != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+                    subtypes = Item.getSubtypes(temporaryAnswer['itemType'][-1]['_ref'])
+                    return len(subtypes) > 0
+        return False
+        
     # individual state callback
     def _questionCallback(self, update, context):
         # save to temporary answer
@@ -291,9 +306,12 @@ class TaskExecutioner(object):
 
         # update question number in context
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
-        # move to next question
-        currentQuestionNumber += 1
-        context.chat_data['currentQuestionNumber'] = currentQuestionNumber
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+        if not self.hasMoreSubtypes(update, context):
+            # move to next question
+            currentQuestionNumber += 1
+            context.chat_data['currentQuestionNumber'] = currentQuestionNumber
+
         if currentQuestionNumber >= self.numOfStates:
             currentQuestionNumber = ConversationHandler.END
             self.saveAnswers(context.chat_data)

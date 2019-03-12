@@ -17,17 +17,20 @@ def start(update, context):
 start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)
 
-taskExecutioner = TaskExecutioner('create-place')
-dispatcher.add_handler(taskExecutioner.conversationHandler)
+createPlaceExecutioner = TaskExecutioner('create-place')
+dispatcher.add_handler(createPlaceExecutioner.conversationHandler)
 
-taskExecutioner = TaskExecutioner('validate-place')
-dispatcher.add_handler(taskExecutioner.conversationHandler)
+validatePlaceExecutioner = TaskExecutioner('validate-place')
+dispatcher.add_handler(validatePlaceExecutioner.conversationHandler)
 
-taskExecutioner = TaskExecutioner('categorize-place')
-dispatcher.add_handler(taskExecutioner.conversationHandler)
+categorizePlaceExecutioner = TaskExecutioner('categorize-place')
+dispatcher.add_handler(categorizePlaceExecutioner.conversationHandler)
 
-taskExecutioner = TaskExecutioner('create-meal')
-dispatcher.add_handler(taskExecutioner.conversationHandler)
+enrichPlaceExecutioner = TaskExecutioner('enrich-place')
+dispatcher.add_handler(enrichPlaceExecutioner.conversationHandler)
+
+createMealExecutioner = TaskExecutioner('create-meal')
+dispatcher.add_handler(createMealExecutioner.conversationHandler)
 
 updater.start_webhook(listen='0.0.0.0', port=env.PORT, url_path=env.TELEGRAM_BOT_TOKEN, webhook_url=env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)
 updater.bot.set_webhook(env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)

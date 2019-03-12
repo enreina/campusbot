@@ -8,6 +8,7 @@ from common.placeUtility import findNearestPlaceItem
 from common.constants import taskType, questionType, specialStates, callbackTypes
 from client.telegramClient import dispatcher
 from pprint import pprint
+from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
 import re
 
 class TaskExecutioner(object):
@@ -64,7 +65,7 @@ class TaskExecutioner(object):
     def sendCurrentQuestion(self, update, context):
         bot = context.bot
         temporaryAnswer = context.chat_data['temporaryAnswer']
-        selectedItem = context.chat_data['selectedItem']
+        
         if 'currentQuestionNumber' in context.chat_data:
             currentQuestionNumber = context.chat_data['currentQuestionNumber']
         else:
@@ -103,7 +104,7 @@ class TaskExecutioner(object):
             if 'itemType' in temporaryAnswer:
                 itemType = temporaryAnswer['itemType'][-1]['_ref']
             else: 
-                itemType = selectedItem['itemType']
+                itemType = context.chat_data['selectedItem']['itemType']
             subtypes = Item.getSubtypes(itemType)
             # build inline button
             keyboardItems = []
@@ -111,10 +112,13 @@ class TaskExecutioner(object):
                 keyboardItems.append([InlineKeyboardButton(subtype['name'], callback_data=subtype['_id'])])
             keyboardItems.append([InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)])
             replyMarkup = InlineKeyboardMarkup(keyboardItems)
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
+            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttons'])
         else:
             replyMarkup = {"remove_keyboard": True}
         
         if currentQuestion['type'] == questionType.QUESTION_TYPE_SINGLE_VALIDATION_LOCATION:
+            selectedItem = context.chat_data['selectedItem']
             bot.send_location(chat_id=chatId, latitude=selectedItem['location']['latitude'], longitude=selectedItem['location']['longitude'])
         bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
 
@@ -134,6 +138,7 @@ class TaskExecutioner(object):
                 formattedResponseOk = currentQuestion['responseOk'].format(itemType=temporaryAnswer['itemType'][-1])
         else: 
             formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
+
         replyMarkup = {"remove_keyboard": True}
         context.bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
 
@@ -163,6 +168,9 @@ class TaskExecutioner(object):
                 temporaryAnswer[propertyName].append(subtype)
             else:
                 temporaryAnswer[propertyName].append(callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
+            callbackData = update.callback_query.data
+            temporaryAnswer[propertyName] = callbackData
         
     def sendConfirmation(self, update, context):
         bot = context.bot
@@ -192,7 +200,7 @@ class TaskExecutioner(object):
 
     def sendClosingStatement(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
-        selectedItem = context.chat_data['selectedItem']
+
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
         else:
@@ -201,7 +209,7 @@ class TaskExecutioner(object):
         if self.task.type == taskType.TASK_TYPE_CREATE_ITEM:
             formattedClosingStatement = self.task.closingStatement.format(item=temporaryAnswer)
         else:
-            formattedClosingStatement = self.task.closingStatement.format(item=selectedItem)
+            formattedClosingStatement = self.task.closingStatement.format(item=context.chat_data['selectedItem'])
 
         replyMarkup = {"remove_keyboard": True}
         context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
@@ -238,6 +246,17 @@ class TaskExecutioner(object):
                 'propertyValue': answers,
                 'userId': chat_data['userId']})
             FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'categorizations', categorizations)
+        elif self.task.type == taskType.TASK_TYPE_ENRICH_ITEM:
+            enrichments = []
+            selectedItem = chat_data['selectedItem']
+            answers = []
+            for question in self.task.questions:
+                enrichments.append({
+                    'propertyName': question['property'],
+                    'propertyValue': temporaryAnswer[question['property']],
+                    'userId': chat_data['userId']
+                })
+            FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'enrichments', enrichments)
             
     def createTaskSelectionHandler(self):
         return MessageHandler(Filters.regex('(\d+)'), self._selectTaskItemCallback)

@@ -128,6 +128,7 @@ class TaskExecutioner(object):
 
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
+            context.bot.answer_callback_query(update.callback_query.id)
         else:
             chatId = update.message.chat_id
         currentQuestion = self.task.questions[currentQuestionNumber]

@@ -13,6 +13,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 ## command handlers
 def start(update, context):
     context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.WELCOME_MESSAGE, parse_mode='Markdown')
+    context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
                 
 start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)

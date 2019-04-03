@@ -6,6 +6,7 @@ from google.cloud.firestore_v1beta1.document import DocumentReference
 from google.cloud.firestore_v1beta1 import ArrayUnion
 import settings as env
 from bunch import Bunch
+import google.cloud.exceptions
 
 cred = credentials.Certificate(env.FIRESTORE_SERVICE_ACCOUNT_PATH)
 firebase_admin.initialize_app(cred)
@@ -38,8 +39,11 @@ def getDocument(collectionName, documentId, populate=False, withRef=False):
     except google.cloud.exceptions.NotFound:
         print(u'No such document!')
 
-def createDocument(collectionName, data={}):
-    db.collection(collectionName).add(data)
+def createDocument(collectionName, documentId=None, data={}):
+    if documentId is not None:
+        saveDocument(collectionName, documentId=documentId, data=data)
+    else:
+        db.collection(collectionName).add(data)
 
 def saveDocument(collectionName, documentId=None, data={}, merge=True):
     db.collection(collectionName).document(documentId).set(data, merge=merge)

@@ -1,5 +1,6 @@
 from telegram.ext import Updater, CommandHandler
 from db.user import User
+from pprint import pprint
 
 class TaskListHandler:
 
@@ -15,7 +16,6 @@ class TaskListHandler:
     def _entry_command_callback(self, update, context):
         bot = context.bot
         chatId = update.message.chat_id
-        userTelegramId = str(update.message.from_user.id)
-        context.chat_data['user'] = User.getUserById(userTelegramId)
+        pprint(context.chat_data)
         # to do, implement to send list of tasks
         bot.send_message(chat_id=chatId, text=u"/place1 <b>TU Delft Library</b> <a href='http://campusbot.cf/task-preview?title=Validate&imageurl=https://d1rkab7tlqy5f1.cloudfront.net/_processed_/2/7/csm_Contactinfo%20gebouw%20buitenkant_54b704d5fa.jpg&itemtype=Place'>\u200f</a>",parse_mode='HTML')

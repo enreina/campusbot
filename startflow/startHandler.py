@@ -1,7 +1,6 @@
 from telegram.ext import Updater, CommandHandler
 from db.user import User
 from dialoguemanager.response import generalCopywriting
-from pprint import pprint
 
 class StartHandler:
 
@@ -20,11 +19,5 @@ class StartHandler:
         context.bot.send_message(chat_id=chatId, text=generalCopywriting.WELCOME_MESSAGE, parse_mode='Markdown')
         context.bot.send_message(chat_id=chatId, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
 
-        # find user, if does not exist create new user
-        try:
-            context.chat_data['user'] = User.getUserById(userTelegramId)
-        except:
-            context.chat_data['user'] = User.createANewUser(userTelegramId)
-
-        pprint(context.chat_data)
+        context.chat_data['user'] = User.getUserById(userTelegramId)
 

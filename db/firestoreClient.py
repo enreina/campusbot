@@ -38,6 +38,9 @@ def getDocument(collectionName, documentId, populate=False, withRef=False):
     except google.cloud.exceptions.NotFound:
         print(u'No such document!')
 
+def createDocument(collectionName, data={}):
+    db.collection(collectionName).add(data)
+
 def saveDocument(collectionName, documentId=None, data={}, merge=True):
     db.collection(collectionName).document(documentId).set(data, merge=merge)
 

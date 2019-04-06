@@ -8,8 +8,9 @@ class StartHandler:
         self.dispatcher = dispatcher
         # create a command handler for entry
         self.start_command_handler = CommandHandler('start', self._start_callback)
-        self.dispatcher.add_handler(self.start_command_handler)
 
+    def add_to_dispatcher(self):
+        self.dispatcher.add_handler(self.start_command_handler)
 
     def _start_callback(self, update, context):
         bot = context.bot

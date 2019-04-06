@@ -12,15 +12,25 @@ dispatcher = updater.dispatcher
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
 
-## command handlers
-def start(update, context):
-    # to-do: register user if this is their first time
-    context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.WELCOME_MESSAGE, parse_mode='Markdown')
-    context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
-                
-
+# /start handler
 startHandler = StartHandler(dispatcher)
-taskListHandler = TaskListHandler('place', 'placeTaskInstances', 'Place', dispatcher)
+startHandler.add_to_dispatcher()
+
+# /place handler
+placeTaskListHandler = TaskListHandler('place', 'placeTaskInstances', 'Place', dispatcher)
+placeTaskListHandler.add_to_dispatcher()
+
+# /food handler
+foodTaskListHandler = TaskListHandler('food', 'foodTaskInstances', 'Food', dispatcher)
+foodTaskListHandler.add_to_dispatcher()
+
+# /course handler
+courseTaskListHandler = TaskListHandler('course', 'courseTaskInstances', 'Course', dispatcher)
+courseTaskListHandler.add_to_dispatcher()
+
+# /trashbin handler
+trashBinTaskListHandler = TaskListHandler('trashbin', 'trashBinTaskInstances', 'Trash Bin', dispatcher)
+trashBinTaskListHandler.add_to_dispatcher()
 
 updater.start_webhook(listen='0.0.0.0', port=env.PORT, url_path=env.TELEGRAM_BOT_TOKEN, webhook_url=env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)
 updater.bot.set_webhook(env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)

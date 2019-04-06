@@ -6,7 +6,7 @@ START_MESSAGE = '''Try one of these commands to start:
 /food - share photo of food that you like - or you don't like 🍔
 /place - let other students know if there is any study space or parking space available 📌
 /course - ask and answer questions about the courses 📖
-/trashbins - find trash bins and report if they are full 🗑
+/trashbin - find trash bins and report if they are full 🗑
 '''
 
 SEND_LOCATION_TEXT = "Send My Location 📍"
@@ -20,3 +20,6 @@ VALIDATE_ANSWER_YES_TEXT = "Yes 👍"
 VALIDATE_ANSWER_NO_TEXT = "No 👎"
 VALIDATE_ANSWER_NOT_SURE_TEXT = "Not sure 🤔"
 VALIDATE_ANSWER_KEYBOARD = [[VALIDATE_ANSWER_YES_TEXT], [VALIDATE_ANSWER_NO_TEXT], [VALIDATE_ANSWER_NOT_SURE_TEXT]]
+
+NO_TASK_INSTANCES_AVAILABLE = '''There is no task for *{canonical_name}* right now 🙁. 
+Fancy to try other commands?'''

@@ -1,8 +1,8 @@
 from telegram.ext import Updater, CommandHandler
 from db.user import User
 from db.taskInstance import TaskInstance
-from pprint import pprint
-from dialoguemanager.response.generalCopywriting import NO_TASK_INSTANCES_AVAILABLE, START_MESSAGE
+from dialoguemanager.response.generalCopywriting import START_MESSAGE
+from dialoguemanager.response.taskListCopywriting import SELECT_TASK_INSTRUCTION, NO_TASK_INSTANCES_AVAILABLE
 
 class TaskListHandler:
 
@@ -51,4 +51,6 @@ class TaskListHandler:
         if not messageOfTaskInstances:
             bot.send_message(chat_id=chatId, text=NO_TASK_INSTANCES_AVAILABLE.format(canonical_name=self.canonical_name), parse_mode='Markdown')
             bot.send_message(chat_id=chatId, text=START_MESSAGE, parse_mode='Markdown')
+        else:
+            bot.send_message(chat_id=chatId, text=SELECT_TASK_INSTRUCTION.format(canonical_name=self.canonical_name), parse_mode='Markdown')
         

@@ -65,7 +65,7 @@ def getDocuments(collectionName, queries=[], withRef=False, populate=False, limi
     for query in queries:
         collectionRef = collectionRef.where(query[0], query[1], query[2])
     if orderBy is not None:
-        collectionRef = collectionRef.order_by(orderBy)
+        collectionRef = collectionRef.order_by(orderBy, direction=orderDirection)
     if limit is not None:
         collectionRef = collectionRef.limit(limit)
     collectedData = collectionRef.get()

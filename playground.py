@@ -1,5 +1,6 @@
 import db.firestoreClient as FirestoreClient
 import datetime
+from google.cloud import firestore
 
 # print(FirestoreClient.getDocument('tasks', 'create-place', populate=False))
 
@@ -8,22 +9,19 @@ import datetime
 
 
 # dummy places
-# FirestoreClient.createDocument('placeItems', {
-#     'image': u'https://d1rkab7tlqy5f1.cloudfront.net/_processed_/3/a/csm_bieb_zon_1_4900798827_o_c8d2b550e5.jpg',
-# 	'name': u'TU Delft Library',
-# 	'geolocation': { 
-# 		'latitude': 52.0027092, 
-# 		'longitude': 4.3731207
-# 	},
-# 	'category': u'Building',
-#     'buildingNumber': 21,
-# 	'route': u'Prometheusplein 1, 2628 ZC Delft',
-# 	'electricityOutlet': True
-# })
-
-FirestoreClient.createDocument('placeTasks', {
-    'itemId': u'9Uo69a5XgwaXdPejQupG',
+newItem = FirestoreClient.createDocument('placeItems', documentId='9Uo69a5XgwaXdPejQupG', data={})
+newTask = FirestoreClient.createDocument('placeTasks', data={
+    'itemId': unicode(newItem.get().id),
+    'item': newItem,
     'type': 0,
-    'createdAt': datetime.datetime.now()
+    'createdAt': firestore.SERVER_TIMESTAMP
+})
+user = FirestoreClient.getDocument('users', '156992599', withRef=True)
+newTaskInstance = FirestoreClient.createDocument('placeTaskInstances', data={
+    'taskId': unicode(newTask.get().id),
+    'task': newTask,
+    'userId': unicode(user['_id']),
+    'user': user['_ref'],
+    'createdAt': firestore.SERVER_TIMESTAMP
 })
 

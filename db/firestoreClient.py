@@ -41,12 +41,18 @@ def getDocument(collectionName, documentId, populate=False, withRef=False):
 
 def createDocument(collectionName, documentId=None, data={}):
     if documentId is not None:
-        saveDocument(collectionName, documentId=documentId, data=data)
+        return saveDocument(collectionName, documentId=documentId, data=data)
     else:
-        db.collection(collectionName).add(data)
+        ref = db.collection(collectionName).document()
+        ref.set(data)
+
+        return ref
 
 def saveDocument(collectionName, documentId=None, data={}, merge=True):
-    db.collection(collectionName).document(documentId).set(data, merge=merge)
+    ref = db.collection(collectionName).document(documentId)
+    ref.set(data, merge=merge)
+
+    return ref
 
 def updateDocument(collectionName, documentId, data):
     db.collection(collectionName).document(documentId).update(data)
@@ -54,7 +60,7 @@ def updateDocument(collectionName, documentId, data):
 def updateArrayInDocument(collectionName, documentId, arrayProperty, newArray):
     updateDocument(collectionName, documentId, {arrayProperty: ArrayUnion(newArray)})
 
-def getDocuments(collectionName, queries=[], withRef=False):
+def getDocuments(collectionName, queries=[], withRef=False, populate=False):
     collectionRef = db.collection(collectionName)
     for query in queries:
         collectionRef = collectionRef.where(query[0], query[1], query[2])

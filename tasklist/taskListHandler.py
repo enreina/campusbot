@@ -26,16 +26,15 @@ class TaskListHandler:
 
         for idx,taskInstance in enumerate(taskInstances):
             # build message
-            taskInstanceTitle = taskInstance.title
+            taskPreview = taskInstance['task_preview']
             task = taskInstance.task
             item = task['item']
             command = "{entry_command}{idx}".format(entry_command=self.entry_command, idx=idx+1)
-            preview_url = "http://campusbot.cf/task-preview?title={taskTypeAsString}&imageurl={item[image]}&itemtype={canonical_name}".format(
-                taskTypeAsString=taskInstance.taskTypeAsString,
-                item=item,
+            preview_url = "http://campusbot.cf/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
+                taskPreview=taskPreview,
                 canonical_name=self.canonical_name
             )
-            message = u"/{command} <b>{title}</b><a href='{preview_url}'>\u200f</a>".format(command=command, title=taskInstanceTitle, preview_url=preview_url)
+            message = u"/{command} <b>{taskPreview[caption]}</b><a href='{preview_url}'>\u200f</a>".format(command=command, taskPreview=taskPreview, preview_url=preview_url)
             messages.append(message)
             # add command handler to dispatcher for this user
             selectTaskCommandHandler = CommandHandler(command, self._select_task_callback, filters=Filters.user(int(user['telegramId'])))

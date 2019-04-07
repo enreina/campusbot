@@ -25,7 +25,7 @@ foodTaskListHandler = TaskListHandler('food', 'foodTaskInstances', 'Food', dispa
 foodTaskListHandler.add_to_dispatcher()
 
 # /course handler
-courseTaskListHandler = TaskListHandler('course', 'courseTaskInstances', 'Course', dispatcher)
+courseTaskListHandler = TaskListHandler('course', 'questionTaskInstances', 'Course', dispatcher)
 courseTaskListHandler.add_to_dispatcher()
 
 # /trashbin handler

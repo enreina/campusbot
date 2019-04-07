@@ -60,10 +60,14 @@ def updateDocument(collectionName, documentId, data):
 def updateArrayInDocument(collectionName, documentId, arrayProperty, newArray):
     updateDocument(collectionName, documentId, {arrayProperty: ArrayUnion(newArray)})
 
-def getDocuments(collectionName, queries=[], withRef=False, populate=False):
+def getDocuments(collectionName, queries=[], withRef=False, populate=False, limit=None, orderBy=None, orderDirection=firestore.Query.ASCENDING):
     collectionRef = db.collection(collectionName)
     for query in queries:
         collectionRef = collectionRef.where(query[0], query[1], query[2])
+    if orderBy is not None:
+        collectionRef = collectionRef.order_by(orderBy)
+    if limit is not None:
+        collectionRef = collectionRef.limit(limit)
     collectedData = collectionRef.get()
     documentsAsList = []
     for item in collectedData:

@@ -4,42 +4,44 @@ from db.user import User
 from db.taskInstance import TaskInstance
 from dialoguemanager.response.generalCopywriting import START_MESSAGE
 from dialoguemanager.response.taskListCopywriting import SELECT_TASK_INSTRUCTION, NO_TASK_INSTANCES_AVAILABLE
+from flowhandler.createFlowHandler import CreateFlowHandler
 
 class TaskListHandler:
 
-    def __init__(self, entry_command, task_instance_collection_name, canonical_name, dispatcher):
+    def __init__(self, entryCommand, taskInstanceCollectionName, canonicalName, dispatcher, itemCollectionName='items'):
         self.dispatcher = dispatcher
-        self.task_instance_collection_name = task_instance_collection_name
-        self.canonical_name = canonical_name
-        self.entry_command = entry_command
+        self.taskInstanceCollectionName = taskInstanceCollectionName
+        self.canonicalName = canonicalName
+        self.entryCommand = entryCommand
         # create a command handler for entry
-        self.entry_command_handler = CommandHandler(entry_command, self._entry_command_callback)
+        self.entryCommandHandler = CommandHandler(entryCommand, self._entry_command_callback)
+        # create a command handler to create new item
+        self.createFlowHandler = CreateFlowHandler(entryCommand, itemCollectionName, dispatcher)
 
     def add_to_dispatcher(self):
-        self.dispatcher.add_handler(self.entry_command_handler)
+        self.dispatcher.add_handler(self.entryCommandHandler)
 
     def build_task_list_message(self, user, update, context):
-        taskInstances = TaskInstance.get_task_instances_for_user(user, task_instance_collection_name=self.task_instance_collection_name)
+        taskInstances = TaskInstance.get_task_instances_for_user(user, taskInstanceCollectionName=self.taskInstanceCollectionName)
         messages = []
         context.chat_data['tasks'] = {}
-        context.chat_data['commandHandlers'] = []
 
         for idx,taskInstance in enumerate(taskInstances):
             # build message
             taskPreview = taskInstance['task_preview']
             task = taskInstance.task
             item = task['item']
-            command = "{entry_command}{idx}".format(entry_command=self.entry_command, idx=idx+1)
+            command = "{entryCommand}{idx}".format(entryCommand=self.canonicalName.lower(), idx=idx+1)
             preview_url = "http://campusbot.cf/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
                 taskPreview=taskPreview,
-                canonical_name=self.canonical_name
+                canonicalName=self.canonicalName
             )
             message = u"/{command} <b>{taskPreview[caption]}</b><a href='{preview_url}'>\u200f</a>".format(command=command, taskPreview=taskPreview, preview_url=preview_url)
             messages.append(message)
             # add command handler to dispatcher for this user
             selectTaskCommandHandler = CommandHandler(command, self._select_task_callback, filters=Filters.user(int(user['telegramId'])))
             self.dispatcher.add_handler(selectTaskCommandHandler)
-            context.chat_data['commandHandlers'].append(selectTaskCommandHandler)
+            context.chat_data['handlers'].append(selectTaskCommandHandler)
 
             context.chat_data['tasks'][command] = taskInstance
         return messages
@@ -50,6 +52,12 @@ class TaskListHandler:
         userTelegramId = unicode(update.message.from_user.id)
         context.chat_data['user'] = User.getUserById(userTelegramId)
         user = context.chat_data['user']
+        # clean command handlers
+        if 'handlers' in context.chat_data:
+            for handler in context.chat_data['handlers']:
+                self.dispatcher.remove_handler(handler)
+        context.chat_data['handlers'] = []
+        self.createFlowHandler.add_to_dispatcher(user)
 
         bot.send_chat_action(chatId, ChatAction.TYPING)
         # to do, implement to send list of tasks
@@ -59,10 +67,10 @@ class TaskListHandler:
             bot.send_message(chat_id=chatId, text=message,parse_mode='HTML')
         
         if not messageOfTaskInstances:
-            bot.send_message(chat_id=chatId, text=NO_TASK_INSTANCES_AVAILABLE.format(canonical_name=self.canonical_name), parse_mode='Markdown')
+            bot.send_message(chat_id=chatId, text=NO_TASK_INSTANCES_AVAILABLE.format(canonicalName=self.canonicalName), parse_mode='Markdown')
             bot.send_message(chat_id=chatId, text=START_MESSAGE, parse_mode='Markdown')
         else:
-            bot.send_message(chat_id=chatId, text=SELECT_TASK_INSTRUCTION.format(canonical_name=self.canonical_name), parse_mode='Markdown')
+            bot.send_message(chat_id=chatId, text=SELECT_TASK_INSTRUCTION.format(canonicalName=self.canonicalName), parse_mode='Markdown')
 
     def _select_task_callback(self, update, context):
         for entity in update.message.entities:
@@ -75,7 +83,7 @@ class TaskListHandler:
         context.bot.send_message(chat_id=update.message.chat_id, text="You have selected *{taskTitle}*".format(taskTitle=taskInstance.title), parse_mode='Markdown')
 
         # clean command handlers
-        for handler in context.chat_data['commandHandlers']:
+        for handler in context.chat_data['handlers']:
             self.dispatcher.remove_handler(handler)
                 
         

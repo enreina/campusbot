@@ -37,13 +37,13 @@ TASK_PREVIEW_RULES = {
 
 class TaskInstance(object):
     @staticmethod
-    def get_task_instances_for_user(user, task_instance_collection_name='placeTaskInstances', limit=5):
+    def get_task_instances_for_user(user, taskInstanceCollectionName='placeTaskInstances', limit=5):
         if type(user) == dict:
             userId = user['_id']
         else:
             userId = user 
         # get task instances
-        task_instances = FirestoreClient.getDocuments(task_instance_collection_name, [
+        task_instances = FirestoreClient.getDocuments(taskInstanceCollectionName, [
             ('userId', '==', userId)], limit=limit, orderBy='createdAt', orderDirection=firestore.Query.DESCENDING)
         # populate task inside each task instance
         for task_instance in task_instances:
@@ -51,14 +51,14 @@ class TaskInstance(object):
             task_instance['task']['item'] = task_instance['task']['item'].get().to_dict()
 
             task_instance['taskTypeAsString'] = TASK_TYPE_AS_STRING[task_instance['task']['type']]
-            task_instance['task_preview'] = TaskInstance.build_task_preview(task_instance, task_instance_collection_name)
+            task_instance['task_preview'] = TaskInstance.build_task_preview(task_instance, taskInstanceCollectionName)
 
         return [Bunch(task_instance) for task_instance in task_instances]
 
     @staticmethod
-    def build_task_preview(task_instance, task_instance_collection_name):
+    def build_task_preview(task_instance, taskInstanceCollectionName):
         task_preview = {}
-        rules = TASK_PREVIEW_RULES[task_instance_collection_name]
+        rules = TASK_PREVIEW_RULES[taskInstanceCollectionName]
         for key,rule in rules.items():
             task_preview[key] = rule.format(task_instance=task_instance)
         

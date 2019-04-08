@@ -1,4 +1,4 @@
-from db.task import Task
+from db.taskTemplate import TaskTemplate
 from db.item import Item
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
@@ -10,59 +10,47 @@ from client.telegramClient import dispatcher
 from pprint import pprint
 from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
 import re
+from datetime import datetime
+from dateutil.tz import tzlocal
 
-class TaskExecutioner(object):
-    '''Execute a certain task
+class GenericFlowHandler(object):
+    '''Abstraction of a task flow handler
 
     Attributes:
-        task: the task data loaded from database
-        currentQuestionNumber: the current state (question number) of executing the task
+        taskTemplate: the task tempalate data loaded from database
+        dispatcher: the dispatcher used by telegram bot api
     '''
 
-    def __init__(self, taskId):
-        self.task = Task.getTaskById(taskId) # load task from db
-        if self.task.type in taskType.TASK_TYPES_WITH_SELECTING_ITEMS:
-            self.initAvailableItems()
-        self.initConversationHandler()
+    def __init__(self, taskTemplateId, dispatcher, itemCollectionName='items'):
+        self.taskTemplate = TaskTemplate.getTaskTemplateById(taskTemplateId) # load task from db
+        self.dispatcher = dispatcher
+        self.itemCollectionName = itemCollectionName
 
-    def initConversationHandler(self):
+    def init_conversation_handler(self, user):
         # entry points
-        entryPoints = [CommandHandler(self.task.entryCommand, self._startTaskCallback)]
+        entryPoints = [CommandHandler(self.taskTemplate.entryCommand, self._start_task_callback, filters=Filters.user(int(user['telegramId'])))]
         # create states
         states = {}
-        hasConfirmation = False
 
-        if 'selectItemStatements' in self.task:
-            states[specialStates.ITEM_SELECTION_STATE] = [self.createTaskSelectionHandler()]
-
-        for questionNumber, question in enumerate(self.task.questions):
+        for questionNumber, question in enumerate(self.taskTemplate.questions):
             # create handler
             if question['type'] == questionType.QUESTION_TYPE_IMAGE:
-                handler = MessageHandler(Filters.photo, self._questionCallback)
+                handler = MessageHandler(Filters.photo, self._question_callback)
             elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
-                handler = MessageHandler(Filters.location, self._questionCallback)
+                handler = MessageHandler(Filters.location, self._question_callback)
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
-                handler = MessageHandler(Filters.text, self._questionCallback)
+                handler = MessageHandler(Filters.text, self._question_callback)
             elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
-                handler = CallbackQueryHandler(self._questionCallback)
+                handler = CallbackQueryHandler(self._question_callback)
             states[questionNumber] = [handler]
-            
-            if 'confirmationText' in question: 
-                hasConfirmation = True
-
-        if hasConfirmation:
-            states[len(self.task.questions)] = [MessageHandler(Filters.text, self._confirmationCallback)]
-            self.numOfStates = len(self.task.questions) + 1
-        else:
-            self.numOfStates = len(self.task.questions)
-
+        self.numOfStates = len(self.taskTemplate.questions)
         self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)])
 
-    def initAvailableItems(self):
-        # load items with corresponding itemType
-        self.availableItems = Item.getItemsByType(self.task.itemType)
-
-    def sendCurrentQuestion(self, update, context):
+    def add_to_dispatcher(self, user):
+        self.init_conversation_handler(user)
+        self.dispatcher.add_handler(self.conversationHandler)
+    
+    def send_current_question(self, update, context):
         bot = context.bot
         temporaryAnswer = context.chat_data['temporaryAnswer']
         
@@ -76,11 +64,8 @@ class TaskExecutioner(object):
         else:
             chatId = update.message.chat_id
 
-        currentQuestion = self.task.questions[currentQuestionNumber]
-        if self.task.type == taskType.TASK_TYPE_CREATE_ITEM:
-            formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
-        else:
-            formattedQuestion = currentQuestion['text'].format(item=context.chat_data['selectedItem'])
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+        formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
 
         if currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
@@ -122,7 +107,7 @@ class TaskExecutioner(object):
             bot.send_location(chat_id=chatId, latitude=selectedItem['location']['latitude'], longitude=selectedItem['location']['longitude'])
         bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
 
-    def sendCurrentQuestionResponse(self, update, context):
+    def send_current_question_response(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
 
@@ -131,7 +116,7 @@ class TaskExecutioner(object):
             context.bot.answer_callback_query(update.callback_query.id)
         else:
             chatId = update.message.chat_id
-        currentQuestion = self.task.questions[currentQuestionNumber]
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
             if temporaryAnswer['itemType'][-1] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 formattedResponseOk = currentQuestion['responseNotSure']
@@ -143,10 +128,10 @@ class TaskExecutioner(object):
         replyMarkup = {"remove_keyboard": True}
         context.bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
 
-    def saveTemporaryAnswer(self, update, context):
+    def save_temporary_answer(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
-        currentQuestion = self.task.questions[currentQuestionNumber]
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         propertyName = currentQuestion['property']
         if currentQuestion['type'] in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
             temporaryAnswer[propertyName] = update.message.text
@@ -172,34 +157,8 @@ class TaskExecutioner(object):
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             callbackData = update.callback_query.data
             temporaryAnswer[propertyName] = callbackData
-        
-    def sendConfirmation(self, update, context):
-        bot = context.bot
-        temporaryAnswer = context.chat_data['temporaryAnswer']
-        if update.callback_query:
-            chatId = update.callback_query.message.chat_id
-        else:
-            chatId = update.message.chat_id
 
-        for question in self.task.questions:
-            if 'confirmationText' in question:
-                formattedConfirmation = question['confirmationText'].format(item=temporaryAnswer)
-                if question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
-                    bot.send_message(chat_id=chatId, text=formattedConfirmation, parse_mode='Markdown')
-                elif question['type'] == questionType.QUESTION_TYPE_IMAGE:
-                    image = temporaryAnswer[question['property']]
-                    bot.send_photo(chat_id=chatId, photo=image, caption=formattedConfirmation, parse_mode='Markdown')
-                elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
-                    location = temporaryAnswer[question['property']]
-                    bot.send_message(chat_id=chatId, text=formattedConfirmation, parse_mode='Markdown')
-                    bot.send_location(chat_id=chatId, latitude=location['latitude'], longitude=location['longitude'])
-
-        # send is that correct
-        replyMarkup = {"keyboard": [[generalCopywriting.YES_BUTTON_TEXT], [generalCopywriting.NO_BUTTON_TEXT]]}
-        bot.send_message(chat_id=chatId, text=generalCopywriting.ASK_DATA_CONFIRMATION_TEXT, reply_markup=replyMarkup, parse_mode='Markdown')
-
-
-    def sendClosingStatement(self, update, context):
+    def send_closing_statement(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
 
         if update.callback_query:
@@ -207,33 +166,31 @@ class TaskExecutioner(object):
         else:
             chatId = update.message.chat_id
 
-        if self.task.type == taskType.TASK_TYPE_CREATE_ITEM:
-            formattedClosingStatement = self.task.closingStatement.format(item=temporaryAnswer)
-        else:
-            formattedClosingStatement = self.task.closingStatement.format(item=context.chat_data['selectedItem'])
+        formattedClosingStatement = self.taskTemplate.closingStatement.format(item=temporaryAnswer)
 
         replyMarkup = {"remove_keyboard": True}
         context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
 
-    def saveAnswers(self, chat_data):
-        temporaryAnswer = chat_data['temporaryAnswer']
-        if self.task.type == taskType.TASK_TYPE_CREATE_ITEM: # task type 
+    def save_answers(self, temporaryAnswer, user):
+        '''
+        userId = user['_id']
+        if self.taskTemplate.type == taskType.TASK_TYPE_CREATE_ITEM: # task type 
             data = temporaryAnswer
-            data['itemType'] = self.task.itemType
-            data['authorId'] = chat_data['userId']
+            data['itemType'] = self.taskTemplate.itemType
+            data['authorId'] = userId
             FirestoreClient.saveDocument('items', data=data)
-        elif self.task.type == taskType.TASK_TYPE_VALIDATE_ITEM:
+        elif self.taskTemplate.type == taskType.TASK_TYPE_VALIDATE_ITEM:
             validations = []
             selectedItem = chat_data['selectedItem']
-            for question in self.task.questions:
+            for question in self.taskTemplate.questions:
                 validations.append({
                     'propertyName': question['property'],
                     'propertyValue': selectedItem[question['property']],
                     'validation': temporaryAnswer[question['property']],
-                    'userId': chat_data['userId']
+                    'userId': userId
                 })
             FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'validations', validations)
-        elif self.task.type == taskType.TASK_TYPE_CATEGORIZE_ITEM:
+        elif self.taskTemplate.type == taskType.TASK_TYPE_CATEGORIZE_ITEM:
             categorizations = []
             selectedItem = chat_data['selectedItem']
             answers = []
@@ -245,120 +202,69 @@ class TaskExecutioner(object):
             categorizations.append({
                 'propertyName': u'itemType',
                 'propertyValue': answers,
-                'userId': chat_data['userId']})
+                'userId': userId})
             FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'categorizations', categorizations)
-        elif self.task.type == taskType.TASK_TYPE_ENRICH_ITEM:
+        elif self.taskTemplate.type == taskType.TASK_TYPE_ENRICH_ITEM:
             enrichments = []
             selectedItem = chat_data['selectedItem']
             answers = []
-            for question in self.task.questions:
+            for question in self.taskTemplate.questions:
                 enrichments.append({
                     'propertyName': question['property'],
                     'propertyValue': temporaryAnswer[question['property']],
-                    'userId': chat_data['userId']
+                    'userId': userId
                 })
             FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'enrichments', enrichments)
+        '''
             
-    def createTaskSelectionHandler(self):
-        return MessageHandler(Filters.regex('(\d+)'), self._selectTaskItemCallback)
-    
-    def sendItemSelectionMessages(self, update, context):
-        bot = context.bot
-
-        openingStatement = self.task.selectItemStatements['openingStatement']
-        taskStatement = self.task.selectItemStatements['taskStatement']
-
-        bot.send_message(chat_id=update.message.chat_id, text=openingStatement, parse_mode='Markdown')
-        # send available task item
-        for itemNumber,item in enumerate(self.availableItems):
-            bot.send_photo(chat_id=update.message.chat_id, photo=item['image'], caption=taskStatement.format(itemNumber=itemNumber+1, item=item), parse_mode='Markdown')
-
     # callbacks
-    def _startTaskCallback(self, update, context):
+    def _start_task_callback(self, update, context):
         bot = context.bot
         context.chat_data['userId'] = update.message.from_user.id
-        context.chat_data['temporaryAnswer'] = {}
+        context.chat_data['temporaryAnswer'] = {
+            'executionStartTime': datetime.now(tzlocal())
+        }
         context.chat_data['chatId'] = update.message.chat_id
         context.chat_data['currentQuestionNumber'] = 0
 
-        bot.send_message(chat_id=update.message.chat_id, text=self.task.openingStatement, parse_mode='Markdown')
+        bot.send_message(chat_id=update.message.chat_id, text=self.taskTemplate.openingStatement, parse_mode='Markdown')
         
-        if 'selectItemStatements' in self.task:
-            self.sendItemSelectionMessages(update, context)
-            context.chat_data['isSelectingItem'] = True
-            return specialStates.ITEM_SELECTION_STATE
-        else:
-            self.sendCurrentQuestion(update, context)
-            return context.chat_data['currentQuestionNumber']
-
-    def _selectTaskItemCallback(self, update, context):
-        bot = context.bot
-        # get number
-        selectedNumber = int(re.search('(\d+)',update.message.text).group(0))
-        if selectedNumber > len(self.availableItems):
-            bot.send_message(chat_id=update.message.chat_id, text=self.task.selectItemStatements['responseError'])
-            return specialStates.ITEM_SELECTION_STATE
-        else:
-            context.chat_data['isSelectingItem'] = False
-            selectedItem = self.availableItems[selectedNumber-1]
-            context.chat_data['selectedItem'] = selectedItem
-            if self.task.type in taskType.TASK_TYPES_WITH_SELECTING_ITEMS and 'image' in selectedItem:
-                bot.send_photo(chat_id=update.message.chat_id, photo=selectedItem.image, parse_mode='Markdown')
-            self.sendCurrentQuestion(update, context)
-            
-            return context.chat_data['currentQuestionNumber']
-        
-    def hasMoreSubtypes(self, update, context):
-        if self.task.type == taskType.TASK_TYPE_CATEGORIZE_ITEM:
-            temporaryAnswer = context.chat_data['temporaryAnswer']
-            if 'itemType' in temporaryAnswer:
-                if temporaryAnswer['itemType'][-1] != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
-                    subtypes = Item.getSubtypes(temporaryAnswer['itemType'][-1]['_ref'])
-                    return len(subtypes) > 0
-        return False
+        self.send_current_question(update, context)
+        return context.chat_data['currentQuestionNumber']
         
     # individual state callback
-    def _questionCallback(self, update, context):
+    def _question_callback(self, update, context):
         # save to temporary answer
-        self.saveTemporaryAnswer(update, context)
+        self.save_temporary_answer(update, context)
         # send response of current question
-        self.sendCurrentQuestionResponse(update, context)
+        self.send_current_question_response(update, context)
 
         # update question number in context
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
-        temporaryAnswer = context.chat_data['temporaryAnswer']
-        if not self.hasMoreSubtypes(update, context):
-            # move to next question
-            currentQuestionNumber += 1
-            context.chat_data['currentQuestionNumber'] = currentQuestionNumber
+        currentQuestionNumber += 1
+        context.chat_data['currentQuestionNumber'] = currentQuestionNumber
 
         if currentQuestionNumber >= self.numOfStates:
             currentQuestionNumber = ConversationHandler.END
-            self.saveAnswers(context.chat_data)
-            self.sendClosingStatement(update, context)
-        elif currentQuestionNumber >= len(self.task.questions):
+            self.save_answers(context.chat_data['temporaryAnswer'], context.chat_data['user'])
+            self.send_closing_statement(update, context)
+        elif currentQuestionNumber >= len(self.taskTemplate.questions):
             self.sendConfirmation(update, context)
         else:
-            self.sendCurrentQuestion(update, context)
+            self.send_current_question(update, context)
 
         return currentQuestionNumber
-
-    def _confirmationCallback(self, update, context):
-        self.saveAnswers(context.chat_data)
-        self.sendClosingStatement(update, context)
-
-        return ConversationHandler.END
 
     # fallback
     def _fallbackCallback(self, update, context):
         if context.chat_data['isSelectingItem']:
-            formattedResponseError = self.task.selectItemStatements['responseError']
+            formattedResponseError = self.taskTemplate.selectItemStatements['responseError']
             context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
             return specialStates.ITEM_SELECTION_STATE
 
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         temporaryAnswer = context.chat_data['temporaryAnswer']
-        currentQuestion = self.task.questions[currentQuestionNumber]
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         formattedResponseError = currentQuestion['responseError'].format(item=temporaryAnswer)
         context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
 

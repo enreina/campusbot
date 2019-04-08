@@ -2,7 +2,6 @@ from telegram.ext import Updater, CommandHandler
 import logging
 import settings as env
 from dialoguemanager.response import generalCopywriting
-from hc.taskExecutioner import TaskExecutioner
 from tasklist.taskListHandler import TaskListHandler
 from startflow.startHandler import StartHandler
 

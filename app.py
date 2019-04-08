@@ -16,7 +16,7 @@ startHandler = StartHandler(dispatcher)
 startHandler.add_to_dispatcher()
 
 # /place handler
-placeTaskListHandler = TaskListHandler('place', 'placeTaskInstances', 'Place', dispatcher)
+placeTaskListHandler = TaskListHandler('place', 'placeTaskInstances', 'Place', dispatcher, 'placeItems')
 placeTaskListHandler.add_to_dispatcher()
 
 # /food handler

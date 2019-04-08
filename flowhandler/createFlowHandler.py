@@ -13,7 +13,6 @@ class CreateFlowHandler(GenericFlowHandler):
     '''
     def __init__(self, canonicalName, itemCollectionName, dispatcher):
         taskTemplateId = 'create-{canonicalName}'.format(canonicalName=canonicalName.lower())
-        print(taskTemplateId)
         super(CreateFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName)
 
 

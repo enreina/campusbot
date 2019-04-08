@@ -12,6 +12,7 @@ from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
 import re
 from datetime import datetime
 from dateutil.tz import tzlocal
+import settings as env
 
 class GenericFlowHandler(object):
     '''Abstraction of a task flow handler
@@ -136,7 +137,11 @@ class GenericFlowHandler(object):
         if currentQuestion['type'] in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
             temporaryAnswer[propertyName] = update.message.text
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_IMAGE:
-            temporaryAnswer[propertyName] = update.message.photo[0].file_id
+            # download image    
+            fileName = update.message.photo[-1].file_id
+            imageFile = update.message.photo[-1].get_file().download(custom_path='{imagePath}/{fileName}.jpg'.format(imagePath=env.IMAGE_DOWNLOAD_PATH, fileName=fileName))
+            temporaryAnswer[propertyName] = u'{imageUrlPrefix}/{fileName}.jpg'.format(imageUrlPrefix=env.IMAGE_URL_PREFIX, fileName=fileName)
+            temporaryAnswer['imageTelegramFileId'] = fileName
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_INPUT:

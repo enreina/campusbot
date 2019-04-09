@@ -1,7 +1,12 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+import json 
 
-def buildInlineKeyboardMarkup(buttons):
+def buildInlineKeyboardMarkup(buttonRows):
     keyboardItems = []
-    for button in buttons:
-        keyboardItems.append([InlineKeyboardButton(button['text'], callback_data=button['value'])])
+    for buttonRow in buttonRows:
+        inlineKeyboardButtonRow = []
+        for button in buttonRow['buttons']:
+            callbackDataInJson = json.dumps({'value': button['value']})
+            inlineKeyboardButtonRow.append(InlineKeyboardButton(button['text'], callback_data=callbackDataInJson))
+        keyboardItems.append(inlineKeyboardButtonRow)
     return InlineKeyboardMarkup(keyboardItems)

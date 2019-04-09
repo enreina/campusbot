@@ -14,6 +14,7 @@ import re
 from datetime import datetime
 from dateutil.tz import tzlocal
 import settings as env
+import json
 
 class GenericFlowHandler(object):
     '''Abstraction of a task flow handler
@@ -99,7 +100,7 @@ class GenericFlowHandler(object):
             keyboardItems.append([InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)])
             replyMarkup = InlineKeyboardMarkup(keyboardItems)
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
-            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttons'])
+            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
         else:
             replyMarkup = {"remove_keyboard": True}
         
@@ -118,6 +119,10 @@ class GenericFlowHandler(object):
         else:
             chatId = update.message.chat_id
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+
+        if 'responseOk' not in currentQuestion:
+            return
+        
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
             if temporaryAnswer[currentQuestion['property']] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 formattedResponseOk = currentQuestion['responseNotSure']
@@ -161,8 +166,8 @@ class GenericFlowHandler(object):
             else:
                 temporaryAnswer[propertyName] = callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE
         elif typeOfQuestion == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
-            callbackData = update.callback_query.data
-            temporaryAnswer[propertyName] = callbackData
+            callbackData = json.loads(update.callback_query.data)
+            temporaryAnswer[propertyName] = callbackData['value']
 
         pprint(temporaryAnswer)
     

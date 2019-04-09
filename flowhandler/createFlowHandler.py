@@ -22,7 +22,7 @@ class CreateFlowHandler(GenericFlowHandler):
     def save_answers(self, temporaryAnswer, user):
         data = temporaryAnswer
         for key,value in temporaryAnswer.items():
-            if '_ref' in value:
+            if isinstance(value, dict) and '_ref' in value:
                 temporaryAnswer[key] = value['_ref']
 
         data['authorId'] = user['_id']

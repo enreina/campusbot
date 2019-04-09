@@ -21,8 +21,18 @@ class CreateFlowHandler(GenericFlowHandler):
     '''
     def save_answers(self, temporaryAnswer, user):
         data = temporaryAnswer
+        for key,value in temporaryAnswer.items():
+            if '_ref' in value:
+                temporaryAnswer[key] = value['_ref']
+
         data['authorId'] = user['_id']
         data['author'] = user['_ref']
         data['createdAt'] = datetime.now(tzlocal())
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
+
+    def _start_task_callback(self, update, context):
+        questionNumber = super(CreateFlowHandler, self)._start_task_callback(update, context)
+        context.chat_data['currentTaskInstance'] = {}
+        
+        return questionNumber

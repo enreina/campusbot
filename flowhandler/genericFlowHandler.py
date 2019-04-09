@@ -1,5 +1,6 @@
 from db.taskTemplate import TaskTemplate
 from db.item import Item
+from db.category import Category
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 from dialoguemanager.response import generalCopywriting
@@ -39,6 +40,8 @@ class GenericFlowHandler(object):
                 handler = MessageHandler(Filters.photo, self._question_callback)
             elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
                 handler = MessageHandler(Filters.location, self._question_callback)
+            elif question['type'] == questionType.QUESTION_TYPE_NUMBER:
+                handler = MessageHandler(Filters.regex(r'^[0-9]*$'), self._question_callback)
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
                 handler = MessageHandler(Filters.text, self._question_callback)
             elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
@@ -86,16 +89,13 @@ class GenericFlowHandler(object):
                         [InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_NOT_SURE)]]
             replyMarkup = InlineKeyboardMarkup(keyboard)
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
-            # load subtypes
-            if 'itemType' in temporaryAnswer:
-                itemType = temporaryAnswer['itemType'][-1]['_ref']
-            else: 
-                itemType = context.chat_data['selectedItem']['itemType']
-            subtypes = Item.getSubtypes(itemType)
+            # load subcategory
+            itemCategory = self.taskTemplate.itemCategory
+            subcategories = Category.getSubcategories(itemCategory)
             # build inline button
             keyboardItems = []
-            for subtype in subtypes:
-                keyboardItems.append([InlineKeyboardButton(subtype['name'], callback_data=subtype['_id'])])
+            for subcategory in subcategories:
+                keyboardItems.append([InlineKeyboardButton(subcategory['name'], callback_data=subcategory['_id'])])
             keyboardItems.append([InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)])
             replyMarkup = InlineKeyboardMarkup(keyboardItems)
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
@@ -111,7 +111,7 @@ class GenericFlowHandler(object):
     def send_current_question_response(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
-
+        
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
             context.bot.answer_callback_query(update.callback_query.id)
@@ -119,10 +119,10 @@ class GenericFlowHandler(object):
             chatId = update.message.chat_id
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
-            if temporaryAnswer['itemType'][-1] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+            if temporaryAnswer[currentQuestion['property']] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 formattedResponseOk = currentQuestion['responseNotSure']
             else:
-                formattedResponseOk = currentQuestion['responseOk'].format(itemType=temporaryAnswer['itemType'][-1])
+                formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
         else: 
             formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
 
@@ -134,35 +134,38 @@ class GenericFlowHandler(object):
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         propertyName = currentQuestion['property']
-        if currentQuestion['type'] in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
+        typeOfQuestion = currentQuestion['type']
+        if typeOfQuestion in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
             temporaryAnswer[propertyName] = update.message.text
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_IMAGE:
+        elif typeOfQuestion == questionType.QUESTION_TYPE_NUMBER:
+            temporaryAnswer[propertyName] = int(update.message.text)
+        elif typeOfQuestion == questionType.QUESTION_TYPE_IMAGE:
             # download image    
             fileName = update.message.photo[-1].file_id
             imageFile = update.message.photo[-1].get_file().download(custom_path='{imagePath}/{fileName}.jpg'.format(imagePath=env.IMAGE_DOWNLOAD_PATH, fileName=fileName))
             temporaryAnswer[propertyName] = u'{imageUrlPrefix}/{fileName}.jpg'.format(imageUrlPrefix=env.IMAGE_URL_PREFIX, fileName=fileName)
             temporaryAnswer['imageTelegramFileId'] = fileName
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
+        elif typeOfQuestion == questionType.QUESTION_TYPE_LOCATION:
             temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_INPUT:
+        elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_INPUT:
             splittedAnswers = [x.strip() for x in update.message.text.split(',')]
             temporaryAnswer[propertyName] = update.message.text
             temporaryAnswer[propertyName + '-list'] = splittedAnswers
-        elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
+        elif typeOfQuestion in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             temporaryAnswer[propertyName] = update.callback_query.data
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
+        elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
             callbackData = update.callback_query.data
-            if propertyName not in temporaryAnswer:
-                temporaryAnswer[propertyName] = []
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
-                subtype = Item.getItemById(callbackData)
-                temporaryAnswer[propertyName].append(subtype)
+                subcategory = Category.getCategoryById(callbackData)
+                temporaryAnswer[propertyName] = subcategory
             else:
-                temporaryAnswer[propertyName].append(callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
+                temporaryAnswer[propertyName] = callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE
+        elif typeOfQuestion == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             callbackData = update.callback_query.data
             temporaryAnswer[propertyName] = callbackData
 
+        pprint(temporaryAnswer)
+    
     def send_closing_statement(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
 
@@ -231,6 +234,7 @@ class GenericFlowHandler(object):
         }
         context.chat_data['chatId'] = update.message.chat_id
         context.chat_data['currentQuestionNumber'] = 0
+        # to-do: update context task instance
 
         bot.send_message(chat_id=update.message.chat_id, text=self.taskTemplate.openingStatement, parse_mode='Markdown')
         
@@ -262,11 +266,6 @@ class GenericFlowHandler(object):
 
     # fallback
     def _fallbackCallback(self, update, context):
-        if context.chat_data['isSelectingItem']:
-            formattedResponseError = self.taskTemplate.selectItemStatements['responseError']
-            context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
-            return specialStates.ITEM_SELECTION_STATE
-
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]

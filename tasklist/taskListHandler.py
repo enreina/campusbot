@@ -5,6 +5,7 @@ from db.taskInstance import TaskInstance
 from dialoguemanager.response.generalCopywriting import START_MESSAGE
 from dialoguemanager.response.taskListCopywriting import SELECT_TASK_INSTRUCTION, NO_TASK_INSTANCES_AVAILABLE
 from flowhandler.createFlowHandler import CreateFlowHandler
+from pprint import pprint
 
 class TaskListHandler:
 
@@ -52,6 +53,9 @@ class TaskListHandler:
         userTelegramId = unicode(update.message.from_user.id)
         context.chat_data['user'] = User.getUserById(userTelegramId)
         user = context.chat_data['user']
+        # don't show list if they are currently in the middle of a task
+        if 'currentTaskInstance' in context.chat_data:
+            return
         # clean command handlers
         if 'handlers' in context.chat_data:
             for handler in context.chat_data['handlers']:

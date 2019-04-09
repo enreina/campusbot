@@ -5,7 +5,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
-from common.placeUtility import findNearestPlaceItem
+from common.placeUtility import findNearestBuilding
 from common.constants import taskType, questionType, specialStates, callbackTypes
 from client.telegramClient import dispatcher
 from pprint import pprint
@@ -74,16 +74,13 @@ class GenericFlowHandler(object):
 
         if currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION_NAME:
-            locationAnswer = temporaryAnswer['location']
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_BUILDING_ITEM:
+            geolocation = temporaryAnswer['geolocation']
             # find nearby places
-            nearbyPlaces = findNearestPlaceItem(locationAnswer['latitude'], locationAnswer['longitude'])
+            nearbyPlaces = findNearestBuilding(geolocation['latitude'], geolocation['longitude'])
             print(nearbyPlaces)
             # construct keyboard for reply
-            keyboardReply = []
-            for place in nearbyPlaces:
-                keyboardReply.append([place['name']])
-            replyMarkup = {"keyboard": keyboardReply}
+            replyMarkup = buildInlineKeyboardMarkup([[buttonRow] for buttonRow in nearbyPlaces])
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_YES),
                         InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NO_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_NO)],
@@ -140,7 +137,8 @@ class GenericFlowHandler(object):
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         propertyName = currentQuestion['property']
         typeOfQuestion = currentQuestion['type']
-        if typeOfQuestion in [questionType.QUESTION_TYPE_TEXT, questionType.QUESTION_TYPE_LOCATION_NAME]:
+
+        if typeOfQuestion == questionType.QUESTION_TYPE_TEXT:
             temporaryAnswer[propertyName] = update.message.text
         elif typeOfQuestion == questionType.QUESTION_TYPE_NUMBER:
             temporaryAnswer[propertyName] = int(update.message.text)
@@ -162,12 +160,20 @@ class GenericFlowHandler(object):
             callbackData = update.callback_query.data
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
-                temporaryAnswer[propertyName] = subcategory
+                temporaryAnswer[propertyName] = subcategory     
             else:
                 temporaryAnswer[propertyName] = callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE
         elif typeOfQuestion == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             callbackData = json.loads(update.callback_query.data)
             temporaryAnswer[propertyName] = callbackData['value']
+        elif typeOfQuestion == questionType.QUESTION_TYPE_BUILDING_ITEM:
+            callbackData = json.loads(update.callback_query.data)
+            print(callbackData)
+            if callbackData['value'] is not None:
+                item = Item.getItemById(callbackData['value'], 'placeItems')
+                temporaryAnswer[propertyName] = item     
+            else:
+                temporaryAnswer[propertyName] = None
 
         pprint(temporaryAnswer)
     

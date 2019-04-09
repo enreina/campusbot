@@ -1,4 +1,5 @@
 from geopy.distance import geodesic
+import db.firestoreClient as FirestoreClient
 
 foodBeveragePlaces = [
     {
@@ -31,3 +32,23 @@ def findNearestPlaceItem(latitude, longitude):
 
     return [{"name":x["name"]} for x in sortedDistances[:2]]
 
+def findNearestBuilding(latitude, longitude, limit=3):
+    buildingCategory = FirestoreClient.getDocumentRef('categories', 'building')
+    buildings = FirestoreClient.getDocuments('placeItems', [('category', '==', buildingCategory)])
+
+    distances = []
+    for building in buildings:
+        buildingLatitude = building['geolocation']['latitude']
+        buildingLongitude = building['geolocation']['longitude']
+        distances.append(
+            {
+                "text": building["name"],
+                "value": building["_id"],
+                "distance": geodesic((buildingLatitude,buildingLongitude), (latitude, longitude)).meters
+            }
+        )
+
+    sortedDistances = sorted(distances, key = lambda i: i['distance'])
+
+    return [{"text":x["text"], "value":x["value"]} for x in sortedDistances[:limit]]
+    

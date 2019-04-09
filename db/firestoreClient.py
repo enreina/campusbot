@@ -78,3 +78,6 @@ def getDocuments(collectionName, queries=[], withRef=False, populate=False, limi
         documentsAsList.append(Bunch(itemAsDict))
    
     return documentsAsList
+
+def getDocumentRef(collectionname, documentId):
+    return db.collection(collectionname).document(documentId)

@@ -11,5 +11,5 @@ class Item(object):
         return FirestoreClient.getDocuments('items', [('subclassOf', '==', itemType)], withRef=True)
     
     @staticmethod
-    def getItemById(itemId):
-        return FirestoreClient.getDocument('items', itemId, withRef=True)
+    def getItemById(itemId, collectionName="items"):
+        return FirestoreClient.getDocument(collectionName, itemId, withRef=True)

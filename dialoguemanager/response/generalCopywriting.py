@@ -21,5 +21,7 @@ VALIDATE_ANSWER_NO_TEXT = "No 👎"
 VALIDATE_ANSWER_NOT_SURE_TEXT = "Not sure 🤔"
 VALIDATE_ANSWER_KEYBOARD = [[VALIDATE_ANSWER_YES_TEXT], [VALIDATE_ANSWER_NO_TEXT], [VALIDATE_ANSWER_NOT_SURE_TEXT]]
 
+GENERAL_NOT_SURE_TEXT = "Not sure 🤔"
+
 NO_TASK_INSTANCES_AVAILABLE = '''There is no task for *{canonical_name}* right now 🙁. 
 Fancy to try other commands?'''

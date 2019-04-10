@@ -37,17 +37,22 @@ class GenericFlowHandler(object):
 
         for questionNumber, question in enumerate(self.taskTemplate.questions):
             # create handler
+            handler = []
             if question['type'] == questionType.QUESTION_TYPE_IMAGE:
-                handler = MessageHandler(Filters.photo, self._question_callback)
+                handler.append(MessageHandler(Filters.photo, self._question_callback))
             elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
-                handler = MessageHandler(Filters.location, self._question_callback)
+                handler.append(MessageHandler(Filters.location, self._question_callback))
             elif question['type'] == questionType.QUESTION_TYPE_NUMBER:
-                handler = MessageHandler(Filters.regex(r'^[0-9]*$'), self._question_callback)
+                handler.append(MessageHandler(Filters.regex(r'^[0-9]*$'), self._question_callback))
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
-                handler = MessageHandler(Filters.text, self._question_callback)
+                handler.append(MessageHandler(Filters.text, self._question_callback))
             elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
-                handler = CallbackQueryHandler(self._question_callback)
-            states[questionNumber] = [handler]
+                handler.append(CallbackQueryHandler(self._question_callback))
+            
+            if question['type'] == questionType.QUESTION_TYPE_BUILDING_ITEM:
+                handler.append(MessageHandler(Filters.text, self._question_callback))
+            
+            states[questionNumber] = handler
         self.numOfStates = len(self.taskTemplate.questions)
         self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)])
 
@@ -78,13 +83,16 @@ class GenericFlowHandler(object):
             geolocation = temporaryAnswer['geolocation']
             # find nearby places
             nearbyPlaces = findNearestBuilding(geolocation['latitude'], geolocation['longitude'])
-            print(nearbyPlaces)
             # construct keyboard for reply
-            replyMarkup = buildInlineKeyboardMarkup([[buttonRow] for buttonRow in nearbyPlaces])
+            buttonRows = [[buttonRow] for buttonRow in nearbyPlaces]
+            buttonRows.append([{'text': 'Not in a building', 'value': None}])
+            replyMarkup = buildInlineKeyboardMarkup(buttonRows, withNotSureOption=True)
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_YES),
                         InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NO_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_NO)],
                         [InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_NOT_SURE)]]
+
+
             replyMarkup = InlineKeyboardMarkup(keyboard)
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
             # load subcategory
@@ -117,7 +125,7 @@ class GenericFlowHandler(object):
             chatId = update.message.chat_id
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
 
-        if 'responseOk' not in currentQuestion:
+        if 'responseOk' not in currentQuestion or currentQuestion['property'] not in temporaryAnswer:
             return
         
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
@@ -161,19 +169,19 @@ class GenericFlowHandler(object):
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
                 temporaryAnswer[propertyName] = subcategory     
-            else:
-                temporaryAnswer[propertyName] = callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE
         elif typeOfQuestion == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             callbackData = json.loads(update.callback_query.data)
             temporaryAnswer[propertyName] = callbackData['value']
         elif typeOfQuestion == questionType.QUESTION_TYPE_BUILDING_ITEM:
-            callbackData = json.loads(update.callback_query.data)
-            print(callbackData)
-            if callbackData['value'] is not None:
-                item = Item.getItemById(callbackData['value'], 'placeItems')
-                temporaryAnswer[propertyName] = item     
+            if update.message:
+                temporaryAnswer[propertyName] = update.message.text
             else:
-                temporaryAnswer[propertyName] = None
+                callbackData = json.loads(update.callback_query.data)
+                if callbackData['value'] is None:
+                    temporaryAnswer[propertyName] = None
+                elif callbackData['value'] != callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE:
+                    item = Item.getItemById(callbackData['value'], 'placeItems')
+                    temporaryAnswer[propertyName] = item     
 
         pprint(temporaryAnswer)
     

@@ -5,7 +5,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
 from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
-from common.placeUtility import findNearestBuilding
+from common.placeUtility import findNearestPlace
 from common.constants import taskType, questionType, specialStates, callbackTypes
 from client.telegramClient import dispatcher
 from pprint import pprint
@@ -50,7 +50,7 @@ class GenericFlowHandler(object):
             elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
                 handler.append(CallbackQueryHandler(self._question_callback))
             
-            if question['type'] == questionType.QUESTION_TYPE_BUILDING_ITEM:
+            if question['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
 
             isRequired = 'isRequired' in question and question['isRequired']
@@ -64,6 +64,9 @@ class GenericFlowHandler(object):
     def add_to_dispatcher(self, user):
         self.init_conversation_handler(user)
         self.dispatcher.add_handler(self.conversationHandler)
+
+    def remove_from_dispatcher(self):
+        self.dispatcher.remove_handler(self.conversationHandler)
     
     def send_current_question(self, update, context):
         bot = context.bot
@@ -84,13 +87,13 @@ class GenericFlowHandler(object):
 
         if currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_BUILDING_ITEM:
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if 'geolocation' in temporaryAnswer:
                 geolocation = temporaryAnswer['geolocation']
             else:
                 geolocation = {'latitude': 0, 'longitude': 0}
             # find nearby places
-            nearbyPlaces = findNearestBuilding(geolocation['latitude'], geolocation['longitude'])
+            nearbyPlaces = findNearestPlace(geolocation['latitude'], geolocation['longitude'], itemCategory=currentQuestion['choiceItemCategory'])
             # construct keyboard for reply
             buttonRows = [[buttonRow] for buttonRow in nearbyPlaces]
             buttonRows.append([{'text': 'Not in a building', 'value': None}])
@@ -168,8 +171,9 @@ class GenericFlowHandler(object):
             temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_INPUT:
             splittedAnswers = [x.strip() for x in update.message.text.split(',')]
-            temporaryAnswer[propertyName] = update.message.text
-            temporaryAnswer[propertyName + '-list'] = splittedAnswers
+            temporaryAnswer[propertyName] = splittedAnswers
+            if 'propertyToConcat' in currentQuestion:
+                temporaryAnswer[currentQuestion['propertyToConcat']] = update.message.text
         elif typeOfQuestion in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             temporaryAnswer[propertyName] = update.callback_query.data
         elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
@@ -180,7 +184,7 @@ class GenericFlowHandler(object):
         elif typeOfQuestion == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             callbackData = json.loads(update.callback_query.data)
             temporaryAnswer[propertyName] = callbackData['value']
-        elif typeOfQuestion == questionType.QUESTION_TYPE_BUILDING_ITEM:
+        elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if update.message:
                 temporaryAnswer[propertyName] = update.message.text
             else:
@@ -301,6 +305,10 @@ class GenericFlowHandler(object):
             currentQuestionNumber = ConversationHandler.END
             self.save_answers(context.chat_data['temporaryAnswer'], context.chat_data['user'])
             self.send_closing_statement(update, context)
+
+            if 'currentTaskInstance' in context.chat_data:
+                del context.chat_data['currentTaskInstance']
+            self.remove_from_dispatcher()
         else:
             self.send_current_question(update, context)
 

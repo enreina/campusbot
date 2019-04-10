@@ -32,19 +32,19 @@ def findNearestPlaceItem(latitude, longitude):
 
     return [{"name":x["name"]} for x in sortedDistances[:2]]
 
-def findNearestBuilding(latitude, longitude, limit=3):
-    buildingCategory = FirestoreClient.getDocumentRef('categories', 'building')
-    buildings = FirestoreClient.getDocuments('placeItems', [('category', '==', buildingCategory)])
+buildingCategory = FirestoreClient.getDocumentRef('categories', 'building')
+def findNearestPlace(latitude, longitude, itemCategory=buildingCategory, limit=3):
+    places = FirestoreClient.getDocuments('placeItems', [('category', '==', itemCategory)])
 
     distances = []
-    for building in buildings:
-        buildingLatitude = building['geolocation']['latitude']
-        buildingLongitude = building['geolocation']['longitude']
+    for place in places:
+        placeLatitude = place['geolocation']['latitude']
+        placeLongitude = place['geolocation']['longitude']
         distances.append(
             {
-                "text": building["name"],
-                "value": building["_id"],
-                "distance": geodesic((buildingLatitude,buildingLongitude), (latitude, longitude)).meters
+                "text": place["name"],
+                "value": place["_id"],
+                "distance": geodesic((placeLatitude,placeLongitude), (latitude, longitude)).meters
             }
         )
 

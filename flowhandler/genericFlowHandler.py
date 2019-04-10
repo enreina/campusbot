@@ -52,6 +52,10 @@ class GenericFlowHandler(object):
             
             if question['type'] == questionType.QUESTION_TYPE_BUILDING_ITEM:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
+
+            isRequired = 'isRequired' in question and question['isRequired']
+            if not isRequired:
+                handler.append(CommandHandler('skip', self._skip_question_callback))
             
             states[questionNumber] = handler
         self.numOfStates = len(self.taskTemplate.questions)
@@ -268,6 +272,13 @@ class GenericFlowHandler(object):
         # send response of current question
         self.send_current_question_response(update, context)
 
+        return self.move_to_next_question(update, context)
+
+    # callback for skipping question
+    def _skip_question_callback(self, update, context):
+        return self.move_to_next_question(update, context)
+
+    def move_to_next_question(self, update, context):
         # update question number in context
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
 

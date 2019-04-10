@@ -10,6 +10,7 @@ from common.constants import taskType, questionType, specialStates, callbackType
 from client.telegramClient import dispatcher
 from pprint import pprint
 from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
+from common import logicJumpHelper
 import re
 from datetime import datetime
 from dateutil.tz import tzlocal
@@ -269,15 +270,23 @@ class GenericFlowHandler(object):
 
         # update question number in context
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
-        currentQuestionNumber += 1
+
+        # check jump rule
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+        shouldJump = False
+        if 'jumpRules' in currentQuestion:
+            shouldJump, jumpIndex = logicJumpHelper.evaluateJumpRules(context.chat_data['temporaryAnswer'], currentQuestion['jumpRules'])
+        
+        if shouldJump:
+            currentQuestionNumber = jumpIndex
+        else:
+            currentQuestionNumber += 1
         context.chat_data['currentQuestionNumber'] = currentQuestionNumber
 
-        if currentQuestionNumber >= self.numOfStates:
+        if currentQuestionNumber >= self.numOfStates or currentQuestionNumber == ConversationHandler.END:
             currentQuestionNumber = ConversationHandler.END
             self.save_answers(context.chat_data['temporaryAnswer'], context.chat_data['user'])
             self.send_closing_statement(update, context)
-        elif currentQuestionNumber >= len(self.taskTemplate.questions):
-            self.sendConfirmation(update, context)
         else:
             self.send_current_question(update, context)
 

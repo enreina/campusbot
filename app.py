@@ -28,7 +28,7 @@ courseTaskListHandler = TaskListHandler('course', 'questionTaskInstances', 'Ques
 courseTaskListHandler.add_to_dispatcher()
 
 # /trashbin handler
-trashBinTaskListHandler = TaskListHandler('trashbin', 'trashBinTaskInstances', 'Trash Bin', dispatcher)
+trashBinTaskListHandler = TaskListHandler('trashbin', 'trashBinTaskInstances', 'Trash Bin', dispatcher, 'trashBinItems')
 trashBinTaskListHandler.add_to_dispatcher()
 
 updater.start_webhook(listen='0.0.0.0', port=env.PORT, url_path=env.TELEGRAM_BOT_TOKEN, webhook_url=env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)

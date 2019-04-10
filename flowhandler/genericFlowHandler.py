@@ -85,7 +85,10 @@ class GenericFlowHandler(object):
         if currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_BUILDING_ITEM:
-            geolocation = temporaryAnswer['geolocation']
+            if 'geolocation' in temporaryAnswer:
+                geolocation = temporaryAnswer['geolocation']
+            else:
+                geolocation = {'latitude': 0, 'longitude': 0}
             # find nearby places
             nearbyPlaces = findNearestBuilding(geolocation['latitude'], geolocation['longitude'])
             # construct keyboard for reply

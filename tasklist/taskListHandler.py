@@ -32,7 +32,7 @@ class TaskListHandler:
             taskPreview = taskInstance['task_preview']
             task = taskInstance.task
             item = task['item']
-            command = "{entryCommand}{idx}".format(entryCommand=self.canonicalName.lower(), idx=idx+1)
+            command = "{entryCommand}{idx}".format(entryCommand=self.canonicalName.lower().replace(" ", ""), idx=idx+1)
             preview_url = "http://campusbot.cf/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
                 taskPreview=taskPreview,
                 canonicalName=self.canonicalName

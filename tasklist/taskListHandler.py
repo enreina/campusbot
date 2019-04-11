@@ -5,19 +5,24 @@ from db.taskInstance import TaskInstance
 from dialoguemanager.response.generalCopywriting import START_MESSAGE
 from dialoguemanager.response.taskListCopywriting import SELECT_TASK_INSTRUCTION, NO_TASK_INSTANCES_AVAILABLE
 from flowhandler.createFlowHandler import CreateFlowHandler
+from flowhandler.enrichFlowHandler import EnrichFlowHandler
 from pprint import pprint
+from common.constants import taskType
 
 class TaskListHandler:
 
-    def __init__(self, entryCommand, taskInstanceCollectionName, canonicalName, dispatcher, itemCollectionName='items'):
+    def __init__(self, entryCommand, taskInstanceCollectionName, canonicalName, dispatcher, itemCollectionNamePrefix=''):
         self.dispatcher = dispatcher
         self.taskInstanceCollectionName = taskInstanceCollectionName
         self.canonicalName = canonicalName
         self.entryCommand = entryCommand
+        self.itemCollectionName = '{prefix}Items'.format(prefix=itemCollectionNamePrefix)
+        self.enrichmentCollectionName = '{prefix}Enrichments'.format(prefix=itemCollectionNamePrefix)
+        self.validationCollectionName = '{prefix}Validations'.format(prefix=itemCollectionNamePrefix)
         # create a command handler for entry
         self.entryCommandHandler = CommandHandler(entryCommand, self._entry_command_callback)
         # create a command handler to create new item
-        self.createFlowHandler = CreateFlowHandler(entryCommand, itemCollectionName, dispatcher)
+        self.createFlowHandler = CreateFlowHandler(entryCommand, self.itemCollectionName, dispatcher)
 
     def add_to_dispatcher(self):
         self.dispatcher.add_handler(self.entryCommandHandler)
@@ -32,7 +37,8 @@ class TaskListHandler:
             taskPreview = taskInstance['task_preview']
             task = taskInstance.task
             item = task['item']
-            command = "{entryCommand}{idx}".format(entryCommand=self.canonicalName.lower().replace(" ", ""), idx=idx+1)
+            cleanCanonicalName = self.canonicalName.lower().replace(" ", "")
+            command = "{entryCommand}{idx}".format(entryCommand=cleanCanonicalName, idx=idx+1)
             preview_url = "http://campusbot.cf/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
                 taskPreview=taskPreview,
                 canonicalName=self.canonicalName
@@ -40,9 +46,10 @@ class TaskListHandler:
             message = u"/{command} <b>{taskPreview[caption]}</b><a href='{preview_url}'>\u200f</a>".format(command=command, taskPreview=taskPreview, preview_url=preview_url)
             messages.append(message)
             # add command handler to dispatcher for this user
-            selectTaskCommandHandler = CommandHandler(command, self._select_task_callback, filters=Filters.user(int(user['telegramId'])))
-            self.dispatcher.add_handler(selectTaskCommandHandler)
-            context.chat_data['handlers'].append(selectTaskCommandHandler)
+            if task['type'] == taskType.TASK_TYPE_ENRICH_ITEM:
+                flowHandler = EnrichFlowHandler(cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance)
+                flowHandler.add_to_dispatcher(user)
+                context.chat_data['handlers'].append(flowHandler.conversationHandler)
 
             context.chat_data['tasks'][command] = taskInstance
         return messages

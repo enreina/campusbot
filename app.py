@@ -16,19 +16,19 @@ startHandler = StartHandler(dispatcher)
 startHandler.add_to_dispatcher()
 
 # /place handler
-placeTaskListHandler = TaskListHandler('place', 'placeTaskInstances', 'Place', dispatcher, 'placeItems')
+placeTaskListHandler = TaskListHandler('place', 'placeTaskInstances', 'Place', dispatcher, 'place')
 placeTaskListHandler.add_to_dispatcher()
 
 # /food handler
-foodTaskListHandler = TaskListHandler('food', 'foodTaskInstances', 'Food', dispatcher, 'foodItems')
+foodTaskListHandler = TaskListHandler('food', 'foodTaskInstances', 'Food', dispatcher, 'food')
 foodTaskListHandler.add_to_dispatcher()
 
 # /course handler
-courseTaskListHandler = TaskListHandler('course', 'questionTaskInstances', 'Question', dispatcher, 'questionItems')
+courseTaskListHandler = TaskListHandler('course', 'questionTaskInstances', 'Question', dispatcher, 'question')
 courseTaskListHandler.add_to_dispatcher()
 
 # /trashbin handler
-trashBinTaskListHandler = TaskListHandler('trashbin', 'trashBinTaskInstances', 'Trash Bin', dispatcher, 'trashBinItems')
+trashBinTaskListHandler = TaskListHandler('trashbin', 'trashBinTaskInstances', 'Trash Bin', dispatcher, 'trashBin')
 trashBinTaskListHandler.add_to_dispatcher()
 
 updater.start_webhook(listen='0.0.0.0', port=env.PORT, url_path=env.TELEGRAM_BOT_TOKEN, webhook_url=env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)

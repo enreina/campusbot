@@ -26,14 +26,18 @@ class GenericFlowHandler(object):
         dispatcher: the dispatcher used by telegram bot api
     '''
 
-    def __init__(self, taskTemplateId, dispatcher, itemCollectionName='items'):
+    def __init__(self, taskTemplateId, dispatcher, itemCollectionName='items', entryCommand=None):
         self.taskTemplate = TaskTemplate.getTaskTemplateById(taskTemplateId) # load task from db
         self.dispatcher = dispatcher
         self.itemCollectionName = itemCollectionName
+        if entryCommand is None:
+            self.entryCommand = self.taskTemplate.entryCommand
+        else:
+            self.entryCommand = entryCommand
 
     def init_conversation_handler(self, user):
         # entry points
-        entryPoints = [CommandHandler(self.taskTemplate.entryCommand, self._start_task_callback, filters=Filters.user(int(user['telegramId'])))]
+        entryPoints = [CommandHandler(self.entryCommand, self._start_task_callback, filters=Filters.user(int(user['telegramId'])))]
         # create states
         states = {}
 
@@ -222,50 +226,7 @@ class GenericFlowHandler(object):
         context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
 
     def save_answers(self, temporaryAnswer, user):
-        '''
-        userId = user['_id']
-        if self.taskTemplate.type == taskType.TASK_TYPE_CREATE_ITEM: # task type 
-            data = temporaryAnswer
-            data['itemType'] = self.taskTemplate.itemType
-            data['authorId'] = userId
-            FirestoreClient.saveDocument('items', data=data)
-        elif self.taskTemplate.type == taskType.TASK_TYPE_VALIDATE_ITEM:
-            validations = []
-            selectedItem = chat_data['selectedItem']
-            for question in self.taskTemplate.questions:
-                validations.append({
-                    'propertyName': question['property'],
-                    'propertyValue': selectedItem[question['property']],
-                    'validation': temporaryAnswer[question['property']],
-                    'userId': userId
-                })
-            FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'validations', validations)
-        elif self.taskTemplate.type == taskType.TASK_TYPE_CATEGORIZE_ITEM:
-            categorizations = []
-            selectedItem = chat_data['selectedItem']
-            answers = []
-            for itemType in temporaryAnswer['itemType']:
-                if itemType != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
-                    answers.append(itemType['_ref'])
-                else:
-                    answers.append(None)
-            categorizations.append({
-                'propertyName': u'itemType',
-                'propertyValue': answers,
-                'userId': userId})
-            FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'categorizations', categorizations)
-        elif self.taskTemplate.type == taskType.TASK_TYPE_ENRICH_ITEM:
-            enrichments = []
-            selectedItem = chat_data['selectedItem']
-            answers = []
-            for question in self.taskTemplate.questions:
-                enrichments.append({
-                    'propertyName': question['property'],
-                    'propertyValue': temporaryAnswer[question['property']],
-                    'userId': userId
-                })
-            FirestoreClient.updateArrayInDocument('items', selectedItem['_id'], 'enrichments', enrichments)
-        '''
+        return
             
     # callbacks
     def _start_task_callback(self, update, context):

@@ -1,5 +1,6 @@
 from db.taskTemplate import TaskTemplate
 from db.item import Item
+from db.course import Course
 from db.category import Category
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHandler, CallbackQueryHandler
@@ -83,7 +84,6 @@ class GenericFlowHandler(object):
             chatId = update.message.chat_id
 
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
-        formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
 
         if currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
@@ -117,13 +117,24 @@ class GenericFlowHandler(object):
             replyMarkup = InlineKeyboardMarkup(keyboardItems)
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
+        elif currentQuestion['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
+            temporaryAnswer['doesCourseExist'] = False
+            course = Course.find_course_by_name(temporaryAnswer['courseName'])
+            # if course does not exist, move to next question
+            if course is None:
+                return self.move_to_next_question(update, context)
+            temporaryAnswer['course'] = course
+            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
         else:
             replyMarkup = {"remove_keyboard": True}
-        
+
+        formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
         if currentQuestion['type'] == questionType.QUESTION_TYPE_SINGLE_VALIDATION_LOCATION:
             selectedItem = context.chat_data['selectedItem']
             bot.send_location(chat_id=chatId, latitude=selectedItem['location']['latitude'], longitude=selectedItem['location']['longitude'])
         bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
+
+        return currentQuestionNumber
 
     def send_current_question_response(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
@@ -181,7 +192,7 @@ class GenericFlowHandler(object):
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
                 temporaryAnswer[propertyName] = subcategory     
-        elif typeOfQuestion == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
+        elif typeOfQuestion in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_CHECK_COURSE]:
             callbackData = json.loads(update.callback_query.data)
             temporaryAnswer[propertyName] = callbackData['value']
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
@@ -310,7 +321,7 @@ class GenericFlowHandler(object):
                 del context.chat_data['currentTaskInstance']
             self.remove_from_dispatcher()
         else:
-            self.send_current_question(update, context)
+            return self.send_current_question(update, context)
 
         return currentQuestionNumber
 

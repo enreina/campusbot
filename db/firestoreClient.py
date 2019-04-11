@@ -32,12 +32,15 @@ def getDocument(collectionName, documentId, populate=False, withRef=False):
     try:
         doc = doc_ref.get()
         documentDictionary = doc.to_dict()
+        if documentDictionary is None:
+            return
         documentDictionary['_id'] = doc.id
         if withRef:
             documentDictionary['_ref'] = doc_ref
         return documentDictionary
     except google.cloud.exceptions.NotFound:
         print(u'No such document!')
+        return None
 
 def createDocument(collectionName, documentId=None, data={}):
     if documentId is not None:
@@ -74,7 +77,7 @@ def getDocuments(collectionName, queries=[], withRef=False, populate=False, limi
         itemAsDict = item.to_dict()
         itemAsDict['_id'] = item.id
         if withRef:
-            itemAsDict['_ref'] = item
+            itemAsDict['_ref'] = db.collection(collectionName).document(item.id)
         documentsAsList.append(Bunch(itemAsDict))
    
     return documentsAsList

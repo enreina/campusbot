@@ -2,6 +2,7 @@ from genericFlowHandler import GenericFlowHandler
 from datetime import datetime
 from dateutil.tz import tzlocal
 import db.firestoreClient as FirestoreClient
+from db.course import Course
 
 class CreateFlowHandler(GenericFlowHandler):
     '''
@@ -28,6 +29,12 @@ class CreateFlowHandler(GenericFlowHandler):
         data['authorId'] = user['_id']
         data['author'] = user['_ref']
         data['createdAt'] = datetime.now(tzlocal())
+
+        if 'doesCourseExist' in temporaryAnswer:
+            if not temporaryAnswer['doesCourseExist']:
+                if 'courseCode' not in data:
+                    data['courseCode'] = None
+                data['course'] = Course.find_or_create_course_ref(data['courseCode'], data['courseName'])
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
 

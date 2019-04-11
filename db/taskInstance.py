@@ -44,7 +44,7 @@ class TaskInstance(object):
             userId = user 
         # get task instances
         task_instances = FirestoreClient.getDocuments(taskInstanceCollectionName, [
-            ('userId', '==', userId)], limit=limit, orderBy='createdAt', orderDirection=firestore.Query.DESCENDING)
+            ('userId', '==', userId)], limit=limit, orderBy='createdAt', orderDirection=firestore.Query.DESCENDING, withRef=True)
         # populate task inside each task instance
         for task_instance in task_instances:
             task_instance['task'] = task_instance['task'].get().to_dict()

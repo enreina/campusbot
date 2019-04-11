@@ -23,16 +23,16 @@ class CreateFlowHandler(GenericFlowHandler):
     def save_answers(self, update, context):
         data = context.chat_data['temporaryAnswer']
         user = context.chat_data['user']
-        for key,value in temporaryAnswer.items():
+        for key,value in data.items():
             if isinstance(value, dict) and '_ref' in value:
-                temporaryAnswer[key] = value['_ref']
+                data[key] = value['_ref']
 
         data['authorId'] = user['_id']
         data['author'] = user['_ref']
         data['createdAt'] = datetime.now(tzlocal())
 
-        if 'doesCourseExist' in temporaryAnswer:
-            if not temporaryAnswer['doesCourseExist']:
+        if 'doesCourseExist' in data:
+            if not data['doesCourseExist']:
                 if 'courseCode' not in data:
                     data['courseCode'] = None
                 data['course'] = Course.find_or_create_course_ref(data['courseCode'], data['courseName'])

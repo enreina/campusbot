@@ -272,6 +272,13 @@ class GenericFlowHandler(object):
 
     # callback for skipping question
     def _skip_question_callback(self, update, context):
+        # remove any answer from temp answer
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+        currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+        if currentQuestion['property'] in temporaryAnswer:
+            del temporaryAnswer[currentQuestion['property']]
+
         return self.move_to_next_question(update, context)
 
     def move_to_next_question(self, update, context):

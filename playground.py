@@ -7,6 +7,8 @@ from pprint import pprint
 from google.cloud.firestore_v1beta1.document import DocumentReference
 
 
-taskTemplateCreateTrashbin = TaskTemplate.getTaskTemplateById('create-trashbin')
-pprint(taskTemplateCreateTrashbin)
+taskTemplateCreatePlace = TaskTemplate.getTaskTemplateById('create-place')
+questions = taskTemplateCreatePlace['questions']
+
+FirestoreClient.updateDocument('taskTemplates', 'enrich-place-test', {'questions': questions})
 

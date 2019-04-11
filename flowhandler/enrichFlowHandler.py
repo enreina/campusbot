@@ -23,15 +23,20 @@ class EnrichFlowHandler(GenericFlowHandler):
     override save answers method
     '''
     def save_answers(self, update, context):
-        data = context.chat_data['temporaryAnswer']
         user = context.chat_data['user']
         taskInstance = context.chat_data['currentTaskInstance']
-        for key,value in temporaryAnswer.items():
-            if isinstance(value, dict) and '_ref' in value:
-                temporaryAnswer[key] = value['_ref']
-        
-        data['taskId'] = taskInstance.task['_id']
-        data['task'] = taskInstance.task['_ref']
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+
+        data = {}
+        for question in self.taskTemplate.questions:
+            propertyName = question['property']
+            if propertyName in temporaryAnswer:
+                value = temporaryAnswer[propertyName]
+                if isinstance(value, dict) and '_ref' in value:
+                    data[propertyName] = value['_ref']
+                else:
+                    data[propertyName] = value
+
         data['taskInstanceId'] = taskInstance['_id']
         data['taskInstance'] = taskInstance['_ref']
         data['createdAt'] = datetime.now(tzlocal())
@@ -40,6 +45,7 @@ class EnrichFlowHandler(GenericFlowHandler):
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance
+        pprint(context.chat_data['currentTaskInstance'])
         context.chat_data['temporaryAnswer'] = self.taskInstance.task['item']
         context.chat_data['temporaryAnswer']['executionStartTime'] = datetime.now(tzlocal())
         questionNumber = super(EnrichFlowHandler, self)._start_task_callback(update, context)

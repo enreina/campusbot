@@ -20,8 +20,9 @@ class CreateFlowHandler(GenericFlowHandler):
     '''
     override save answers method
     '''
-    def save_answers(self, temporaryAnswer, user):
-        data = temporaryAnswer
+    def save_answers(self, update, context):
+        data = context.chat_data['temporaryAnswer']
+        user = context.chat_data['user']
         for key,value in temporaryAnswer.items():
             if isinstance(value, dict) and '_ref' in value:
                 temporaryAnswer[key] = value['_ref']
@@ -41,5 +42,8 @@ class CreateFlowHandler(GenericFlowHandler):
     def _start_task_callback(self, update, context):
         questionNumber = super(CreateFlowHandler, self)._start_task_callback(update, context)
         context.chat_data['currentTaskInstance'] = {}
+        context.chat_data['temporaryAnswer'] = {
+            'executionStartTime': datetime.now(tzlocal())
+        }
         
         return questionNumber

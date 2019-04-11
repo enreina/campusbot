@@ -13,8 +13,6 @@ from pprint import pprint
 from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
 from common import logicJumpHelper
 import re
-from datetime import datetime
-from dateutil.tz import tzlocal
 import settings as env
 import json
 
@@ -75,7 +73,10 @@ class GenericFlowHandler(object):
     
     def send_current_question(self, update, context):
         bot = context.bot
-        temporaryAnswer = context.chat_data['temporaryAnswer']
+        if 'temporaryAnswer' in context.chat_data:
+            temporaryAnswer = context.chat_data['temporaryAnswer']
+        else:
+            temporaryAnswer = {}
         
         if 'currentQuestionNumber' in context.chat_data:
             currentQuestionNumber = context.chat_data['currentQuestionNumber']
@@ -212,7 +213,7 @@ class GenericFlowHandler(object):
 
         pprint(temporaryAnswer)
     
-    def send_closing_statement(self, update, context):
+    def send_closing_statements(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
 
         if update.callback_query:
@@ -220,26 +221,42 @@ class GenericFlowHandler(object):
         else:
             chatId = update.message.chat_id
 
-        formattedClosingStatement = self.taskTemplate.closingStatement.format(item=temporaryAnswer)
+        for statement in self.taskTemplate.closingStatements:
+            formattedClosingStatement = statement.format(item=temporaryAnswer)
 
-        replyMarkup = {"remove_keyboard": True}
-        context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
+            replyMarkup = {"remove_keyboard": True}
+            context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
 
-    def save_answers(self, temporaryAnswer, user):
+    def save_answers(self, update, context):
         return
             
     # callbacks
     def _start_task_callback(self, update, context):
         bot = context.bot
         context.chat_data['userId'] = update.message.from_user.id
-        context.chat_data['temporaryAnswer'] = {
-            'executionStartTime': datetime.now(tzlocal())
-        }
         context.chat_data['chatId'] = update.message.chat_id
         context.chat_data['currentQuestionNumber'] = 0
-        # to-do: update context task instance
 
-        bot.send_message(chat_id=update.message.chat_id, text=self.taskTemplate.openingStatement, parse_mode='Markdown')
+        for statement in self.taskTemplate.openingStatements:
+            item = None
+            if 'temporaryAnswer' in context.chat_data:
+                item = context.chat_data['temporaryAnswer']
+            
+            if isinstance(statement, dict):
+                if 'imagePropertyName' in statement:
+                    image = item[statement['imagePropertyName']]
+                    if 'imageCaption' in statement:
+                        caption = statement['imageCaption'].format(item=item)
+
+                    bot.send_photo(chat_id=update.message.chat_id, photo=image, caption=caption, parse_mode='Markdown')
+                if 'jumpRules' in statement:
+                    jumpRules = statement['jumpRules']
+                    shouldJump, jumpIndex = logicJumpHelper.evaluateJumpRules(item, jumpRules)
+
+                    if shouldJump:
+                        context.chat_data['currentQuestionNumber'] = jumpIndex
+            else:
+                bot.send_message(chat_id=update.message.chat_id, text=statement.format(item=item), parse_mode='Markdown')
         
         self.send_current_question(update, context)
         return context.chat_data['currentQuestionNumber']
@@ -275,8 +292,8 @@ class GenericFlowHandler(object):
 
         if currentQuestionNumber >= self.numOfStates or currentQuestionNumber == ConversationHandler.END:
             currentQuestionNumber = ConversationHandler.END
-            self.save_answers(context.chat_data['temporaryAnswer'], context.chat_data['user'])
-            self.send_closing_statement(update, context)
+            self.save_answers(update, context)
+            self.send_closing_statements(update, context)
 
             if 'currentTaskInstance' in context.chat_data:
                 del context.chat_data['currentTaskInstance']

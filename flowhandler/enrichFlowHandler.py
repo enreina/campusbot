@@ -3,6 +3,7 @@ from datetime import datetime
 from dateutil.tz import tzlocal
 import db.firestoreClient as FirestoreClient
 from db.course import Course
+from pprint import pprint
 
 class EnrichFlowHandler(GenericFlowHandler):
     '''
@@ -21,26 +22,26 @@ class EnrichFlowHandler(GenericFlowHandler):
     '''
     override save answers method
     '''
-    def save_answers(self, temporaryAnswer, user):
-        data = temporaryAnswer
+    def save_answers(self, update, context):
+        data = context.chat_data['temporaryAnswer']
+        user = context.chat_data['user']
+        taskInstance = context.chat_data['currentTaskInstance']
         for key,value in temporaryAnswer.items():
             if isinstance(value, dict) and '_ref' in value:
                 temporaryAnswer[key] = value['_ref']
-
-        data['authorId'] = user['_id']
-        data['author'] = user['_ref']
+        
+        data['taskId'] = taskInstance.task['_id']
+        data['task'] = taskInstance.task['_ref']
+        data['taskInstanceId'] = taskInstance['_id']
+        data['taskInstance'] = taskInstance['_ref']
         data['createdAt'] = datetime.now(tzlocal())
-
-        if 'doesCourseExist' in temporaryAnswer:
-            if not temporaryAnswer['doesCourseExist']:
-                if 'courseCode' not in data:
-                    data['courseCode'] = None
-                data['course'] = Course.find_or_create_course_ref(data['courseCode'], data['courseName'])
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
 
     def _start_task_callback(self, update, context):
-        questionNumber = super(EnrichFlowHandler, self)._start_task_callback(update, context)
         context.chat_data['currentTaskInstance'] = self.taskInstance
-        
+        context.chat_data['temporaryAnswer'] = self.taskInstance.task['item']
+        context.chat_data['temporaryAnswer']['executionStartTime'] = datetime.now(tzlocal())
+        questionNumber = super(EnrichFlowHandler, self)._start_task_callback(update, context)
+
         return questionNumber

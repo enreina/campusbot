@@ -47,7 +47,7 @@ class GenericFlowHandler(object):
             elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
                 handler.append(MessageHandler(Filters.location, self._question_callback))
             elif question['type'] == questionType.QUESTION_TYPE_NUMBER:
-                handler.append(MessageHandler(Filters.regex(r'^[0-9]*$'), self._question_callback))
+                handler.append(MessageHandler(Filters.regex(r'^[0-9]*.?[0-9]+$'), self._question_callback))
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
             elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
@@ -176,7 +176,10 @@ class GenericFlowHandler(object):
         if typeOfQuestion == questionType.QUESTION_TYPE_TEXT:
             temporaryAnswer[propertyName] = update.message.text
         elif typeOfQuestion == questionType.QUESTION_TYPE_NUMBER:
-            temporaryAnswer[propertyName] = int(update.message.text)
+            try:
+                temporaryAnswer[propertyName] = int(update.message.text)
+            except:
+                temporaryAnswer[propertyName] = float(update.message.text)
         elif typeOfQuestion == questionType.QUESTION_TYPE_IMAGE:
             # download image    
             fileName = update.message.photo[-1].file_id

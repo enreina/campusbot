@@ -47,7 +47,11 @@ class GenericFlowHandler(object):
             elif question['type'] == questionType.QUESTION_TYPE_LOCATION:
                 handler.append(MessageHandler(Filters.location, self._question_callback))
             elif question['type'] == questionType.QUESTION_TYPE_NUMBER:
-                handler.append(MessageHandler(Filters.regex(r'^[0-9]*.?[0-9]+$'), self._question_callback))
+                if 'regexRule' in question:
+                    regexRule = r'{regexRule}'.format(regexRule=question['regexRule'])
+                else:
+                    regexRule = r'^\s*[0-9]*.?[0-9]+\s*$'
+                handler.append(MessageHandler(Filters.regex(regexRule), self._question_callback))
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
             elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
@@ -133,7 +137,15 @@ class GenericFlowHandler(object):
         else:
             replyMarkup = {"remove_keyboard": True}
 
-        formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
+        if 'multiItemPropertyName' in currentQuestion:
+            # handle question with multiple input
+            if 'currentItemIndex' not in context.chat_data:
+                context.chat_data['currentItemIndex'] = 0
+            currentItemIndex = context.chat_data['currentItemIndex']
+            item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
+            formattedQuestion = currentQuestion['text'].format(item=item)
+        else:
+            formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
         if currentQuestion['type'] == questionType.QUESTION_TYPE_SINGLE_VALIDATION_LOCATION:
             selectedItem = context.chat_data['selectedItem']
             bot.send_location(chat_id=chatId, latitude=selectedItem['location']['latitude'], longitude=selectedItem['location']['longitude'])
@@ -172,48 +184,61 @@ class GenericFlowHandler(object):
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         propertyName = currentQuestion['property']
         typeOfQuestion = currentQuestion['type']
+        answer = None
 
         if typeOfQuestion == questionType.QUESTION_TYPE_TEXT:
-            temporaryAnswer[propertyName] = update.message.text
+            answer = update.message.text
         elif typeOfQuestion == questionType.QUESTION_TYPE_NUMBER:
             try:
-                temporaryAnswer[propertyName] = int(update.message.text)
+                answer = int(update.message.text)
             except:
-                temporaryAnswer[propertyName] = float(update.message.text)
+                answer = float(update.message.text)
         elif typeOfQuestion == questionType.QUESTION_TYPE_IMAGE:
             # download image    
             fileName = update.message.photo[-1].file_id
             imageFile = update.message.photo[-1].get_file().download(custom_path='{imagePath}/{fileName}.jpg'.format(imagePath=env.IMAGE_DOWNLOAD_PATH, fileName=fileName))
-            temporaryAnswer[propertyName] = u'{imageUrlPrefix}/{fileName}.jpg'.format(imageUrlPrefix=env.IMAGE_URL_PREFIX, fileName=fileName)
+            answer = u'{imageUrlPrefix}/{fileName}.jpg'.format(imageUrlPrefix=env.IMAGE_URL_PREFIX, fileName=fileName)
             temporaryAnswer['imageTelegramFileId'] = fileName
         elif typeOfQuestion == questionType.QUESTION_TYPE_LOCATION:
-            temporaryAnswer[propertyName] = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}
+            answer = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_INPUT:
             splittedAnswers = [x.strip() for x in update.message.text.split(',')]
-            temporaryAnswer[propertyName] = splittedAnswers
+            answer = splittedAnswers
             if 'propertyToConcat' in currentQuestion:
                 temporaryAnswer[currentQuestion['propertyToConcat']] = update.message.text
         elif typeOfQuestion in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
-            temporaryAnswer[propertyName] = update.callback_query.data
+            answer = update.callback_query.data
         elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
             callbackData = update.callback_query.data
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
-                temporaryAnswer[propertyName] = subcategory     
+                answer = subcategory     
         elif typeOfQuestion in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_CHECK_COURSE]:
             callbackData = json.loads(update.callback_query.data)
-            temporaryAnswer[propertyName] = callbackData['value']
+            answer = callbackData['value']
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if update.message:
-                temporaryAnswer[propertyName] = update.message.text
+                answer = update.message.text
             else:
                 callbackData = json.loads(update.callback_query.data)
                 if callbackData['value'] is None:
-                    temporaryAnswer[propertyName] = None
+                    answer = None
                 elif callbackData['value'] != callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE:
                     item = Item.getItemById(callbackData['value'], 'placeItems')
-                    temporaryAnswer[propertyName] = item     
+                    answer = item     
 
+        if 'multiItemPropertyName' in currentQuestion:
+            # handle question with multiple input
+            currentItemIndex = context.chat_data['currentItemIndex']
+            item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
+            answer = {'propertyName': unicode(item), 'propertyValue': answer}
+            if propertyName in temporaryAnswer:
+                temporaryAnswer[propertyName].append(answer)
+            else:
+                temporaryAnswer[propertyName] = [answer]
+        else:
+            temporaryAnswer[propertyName] = answer
+        
         pprint(temporaryAnswer)
     
     def send_closing_statements(self, update, context):
@@ -279,17 +304,41 @@ class GenericFlowHandler(object):
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
-        if currentQuestion['property'] in temporaryAnswer:
-            del temporaryAnswer[currentQuestion['property']]
+        propertyName = currentQuestion['property']
+        if 'multiItemPropertyName' in currentQuestion:
+            # handle question with multiple input
+            currentItemIndex = context.chat_data['currentItemIndex']
+            item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
+            answer = {'propertyName': unicode(item), 'propertyValue': None}
+            if propertyName in temporaryAnswer:
+                temporaryAnswer[propertyName].append(answer)
+            else:
+                temporaryAnswer[propertyName] = [answer]
+        elif propertyName in temporaryAnswer:
+            del temporaryAnswer[propertyName]
 
         return self.move_to_next_question(update, context)
 
     def move_to_next_question(self, update, context):
         # update question number in context
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+        
+        # retain current question if still in multiple item question
+        if 'multiItemPropertyName' in currentQuestion:
+            # add 1 to index of multiple item index
+            currentItemIndex = context.chat_data['currentItemIndex']
+            currentItemIndex = currentItemIndex + 1
+            temporaryAnswer = context.chat_data['temporaryAnswer']
+
+            if currentItemIndex >= len(temporaryAnswer[currentQuestion['multiItemPropertyName']]):
+                del context.chat_data['currentItemIndex']
+            else:
+                context.chat_data['currentItemIndex'] = currentItemIndex
+                return self.send_current_question(update, context)
+
 
         # check jump rule
-        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         shouldJump = False
         if 'jumpRules' in currentQuestion:
             shouldJump, jumpIndex = logicJumpHelper.evaluateJumpRules(context.chat_data['temporaryAnswer'], currentQuestion['jumpRules'])

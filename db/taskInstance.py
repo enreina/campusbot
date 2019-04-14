@@ -30,7 +30,7 @@ TASK_PREVIEW_RULES = {
         'caption': '',
         'imageurl': 'http://campusbot.cf/images/blank-white-image.png',
         'title': '{task_instance[task][item][question]}',
-        'description': '',
+        'description': '{task_instance[taskTypeAsString]}',
         'itemtype': '{task_instance[task][item][courseName]}'
     },
 }

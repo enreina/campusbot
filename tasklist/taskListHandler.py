@@ -6,6 +6,7 @@ from dialoguemanager.response.generalCopywriting import START_MESSAGE
 from dialoguemanager.response.taskListCopywriting import SELECT_TASK_INSTRUCTION, NO_TASK_INSTANCES_AVAILABLE
 from flowhandler.createFlowHandler import CreateFlowHandler
 from flowhandler.enrichFlowHandler import EnrichFlowHandler
+from flowhandler.validateFlowHandler import ValidateFlowHandler
 from pprint import pprint
 from common.constants import taskType
 
@@ -48,8 +49,11 @@ class TaskListHandler:
             # add command handler to dispatcher for this user
             if task['type'] == taskType.TASK_TYPE_ENRICH_ITEM:
                 flowHandler = EnrichFlowHandler(cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance)
-                flowHandler.add_to_dispatcher(user)
-                context.chat_data['handlers'].append(flowHandler.conversationHandler)
+            elif task['type'] == taskType.TASK_TYPE_VALIDATE_ITEM:
+                flowHandler = ValidateFlowHandler(cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance)
+        
+            flowHandler.add_to_dispatcher(user)
+            context.chat_data['handlers'].append(flowHandler.conversationHandler)
 
             context.chat_data['tasks'][command] = taskInstance
         return messages

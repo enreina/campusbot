@@ -137,6 +137,12 @@ class GenericFlowHandler(object):
         else:
             replyMarkup = {"remove_keyboard": True}
 
+        # check must have properties
+        if 'mustHaveProperties' in currentQuestion:
+            for prop in currentQuestion['mustHaveProperties']:
+                if prop not in temporaryAnswer or temporaryAnswer[prop] is None:
+                    return self.move_to_next_question(update, context)
+
         if 'multiItemPropertyName' in currentQuestion:
             # handle question with multiple input
             if 'currentItemIndex' not in context.chat_data:
@@ -146,9 +152,7 @@ class GenericFlowHandler(object):
             formattedQuestion = currentQuestion['text'].format(item=item)
         else:
             formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
-        if currentQuestion['type'] == questionType.QUESTION_TYPE_SINGLE_VALIDATION_LOCATION:
-            selectedItem = context.chat_data['selectedItem']
-            bot.send_location(chat_id=chatId, latitude=selectedItem['location']['latitude'], longitude=selectedItem['location']['longitude'])
+
         bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
 
         return currentQuestionNumber

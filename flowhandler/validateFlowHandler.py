@@ -5,7 +5,7 @@ import db.firestoreClient as FirestoreClient
 from db.course import Course
 from pprint import pprint
 
-class EnrichFlowHandler(GenericFlowHandler):
+class ValidateFlowHandler(GenericFlowHandler):
     '''
     Flow handler for 'enrich' task
 
@@ -14,9 +14,9 @@ class EnrichFlowHandler(GenericFlowHandler):
         dispatcher: the dispatcher used to handle telegram bot updates
     '''
     def __init__(self, canonicalName, itemCollectionName, dispatcher, entryCommand, taskInstance):
-        taskTemplateId = 'enrich-{canonicalName}'.format(canonicalName=canonicalName.lower())
+        taskTemplateId = 'validate-{canonicalName}'.format(canonicalName=canonicalName.lower())
         self.taskInstance = taskInstance
-        super(EnrichFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName, entryCommand=entryCommand)
+        super(ValidateFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName, entryCommand=entryCommand)
 
 
     '''
@@ -46,8 +46,13 @@ class EnrichFlowHandler(GenericFlowHandler):
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance
-        context.chat_data['temporaryAnswer'] = self.taskInstance.task['item']
+        context.chat_data['temporaryAnswer'] = self.taskInstance.task['aggregatedAnswers']
         context.chat_data['temporaryAnswer']['executionStartTime'] = datetime.now(tzlocal())
-        questionNumber = super(EnrichFlowHandler, self)._start_task_callback(update, context)
+        questionNumber = super(ValidateFlowHandler, self)._start_task_callback(update, context)
 
+        return questionNumber
+
+    def send_current_question(self, update, context):
+        questionNumber = super(ValidateFlowHandler, self).send_current_question(update, context)
+        temporaryAnswer = context.chat_data['temporaryAnswer']
         return questionNumber

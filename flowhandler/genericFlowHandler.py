@@ -149,7 +149,7 @@ class GenericFlowHandler(object):
                 context.chat_data['currentItemIndex'] = 0
             currentItemIndex = context.chat_data['currentItemIndex']
             item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
-            formattedQuestion = currentQuestion['text'].format(item=item)
+            formattedQuestion = currentQuestion['text'].format(item=item, idx=currentItemIndex+1)
         else:
             formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
 
@@ -235,11 +235,18 @@ class GenericFlowHandler(object):
             # handle question with multiple input
             currentItemIndex = context.chat_data['currentItemIndex']
             item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
-            answer = {'propertyName': unicode(item), 'propertyValue': answer}
-            if propertyName in temporaryAnswer:
-                temporaryAnswer[propertyName].append(answer)
+            saveAsArray = 'saveAsArray' in currentQuestion and currentQuestion['saveAsArray']
+            if not saveAsArray:
+                answer = {'propertyName': unicode(item), 'propertyValue': answer}
             else:
-                temporaryAnswer[propertyName] = [answer]
+                if answer is not None and answer:
+                    answer = item
+            if propertyName in temporaryAnswer:
+                if saveAsArray and answer or not saveAsArray:
+                    temporaryAnswer[propertyName].append(answer)
+            else:
+                if saveAsArray and answer or not saveAsArray:
+                    temporaryAnswer[propertyName] = [answer]
         else:
             temporaryAnswer[propertyName] = answer
         
@@ -277,6 +284,7 @@ class GenericFlowHandler(object):
             if isinstance(statement, dict):
                 if 'imagePropertyName' in statement:
                     image = item[statement['imagePropertyName']]
+                    caption=None
                     if 'imageCaption' in statement:
                         caption = statement['imageCaption'].format(item=item)
 
@@ -314,10 +322,12 @@ class GenericFlowHandler(object):
             currentItemIndex = context.chat_data['currentItemIndex']
             item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
             answer = {'propertyName': unicode(item), 'propertyValue': None}
-            if propertyName in temporaryAnswer:
-                temporaryAnswer[propertyName].append(answer)
-            else:
-                temporaryAnswer[propertyName] = [answer]
+            saveAsArray = 'saveAsArray' in currentQuestion and currentQuestion['saveAsArray']
+            if not saveAsArray:
+                if propertyName in temporaryAnswer:
+                    temporaryAnswer[propertyName].append(answer)
+                else:
+                    temporaryAnswer[propertyName] = [answer]
         elif propertyName in temporaryAnswer:
             del temporaryAnswer[propertyName]
 

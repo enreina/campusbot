@@ -3,6 +3,7 @@ import firestoreClient as FirestoreClient
 from bunch import Bunch
 from common.constants.taskType import TASK_TYPE_AS_STRING
 from firebase_admin import firestore
+from pprint import pprint
 
 TASK_PREVIEW_RULES = {
     'placeTaskInstances': {
@@ -39,12 +40,12 @@ class TaskInstance(object):
     @staticmethod
     def get_task_instances_for_user(user, taskInstanceCollectionName='placeTaskInstances', limit=5):
         if type(user) == dict:
-            userId = user['_id']
+            userId = str(user['_id'])
         else:
-            userId = user 
+            userId = str(user) 
         # get task instances
-        task_instances = FirestoreClient.getDocuments(taskInstanceCollectionName, [
-            ('userId', '==', userId)], limit=limit, orderBy='createdAt', orderDirection=firestore.Query.DESCENDING, withRef=True)
+        task_instances = FirestoreClient.getDocumentsFromSubcollection('users', userId, taskInstanceCollectionName, limit=limit, orderBy='createdAt', orderDirection=firestore.Query.DESCENDING, withRef=True)
+        pprint(task_instances)
         # populate task inside each task instance
         for task_instance in task_instances:
             task_instance['task'] = task_instance['task'].get().to_dict()

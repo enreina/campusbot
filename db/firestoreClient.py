@@ -63,8 +63,11 @@ def updateDocument(collectionName, documentId, data):
 def updateArrayInDocument(collectionName, documentId, arrayProperty, newArray):
     updateDocument(collectionName, documentId, {arrayProperty: ArrayUnion(newArray)})
 
-def getDocuments(collectionName, queries=[], withRef=False, populate=False, limit=None, orderBy=None, orderDirection=firestore.Query.ASCENDING):
-    collectionRef = db.collection(collectionName)
+def getDocuments(collectionName=None, queries=[], withRef=False, populate=False, limit=None, orderBy=None, orderDirection=firestore.Query.ASCENDING, collectionRef=None):
+    if collectionRef is None:
+        collectionRef = db.collection(collectionName)
+    originalCollectionRef = collectionRef
+
     for query in queries:
         collectionRef = collectionRef.where(query[0], query[1], query[2])
     if orderBy is not None:
@@ -77,10 +80,14 @@ def getDocuments(collectionName, queries=[], withRef=False, populate=False, limi
         itemAsDict = item.to_dict()
         itemAsDict['_id'] = item.id
         if withRef:
-            itemAsDict['_ref'] = db.collection(collectionName).document(item.id)
+            itemAsDict['_ref'] = originalCollectionRef.document(item.id)
         documentsAsList.append(Bunch(itemAsDict))
    
     return documentsAsList
+
+def getDocumentsFromSubcollection(collectionName, documentId, subCollectionName, queries=[], withRef=False, populate=False, limit=None, orderBy=None, orderDirection=firestore.Query.ASCENDING):
+    collectionRef = db.collection(collectionName).document(documentId).collection(subCollectionName)
+    return getDocuments(queries=queries, withRef=withRef, populate=populate, limit=limit, orderBy=orderBy, orderDirection=orderDirection, collectionRef=collectionRef)
 
 def getDocumentRef(collectionname, documentId):
     return db.collection(collectionname).document(documentId)

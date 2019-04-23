@@ -217,6 +217,7 @@ class GenericFlowHandler(object):
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
                 answer = subcategory     
+                temporaryAnswer['categoryName'] = subcategory['name']
         elif typeOfQuestion in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_CHECK_COURSE]:
             callbackData = json.loads(update.callback_query.data)
             answer = callbackData['value']

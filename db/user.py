@@ -16,7 +16,8 @@ class User(object):
         newUser = {
             'telegramId': telegramId,
             'createdAt': firestore.SERVER_TIMESTAMP,
-            'tasksCompleted': []
+            'tasksCompleted': [],
+            'totalTasksCompleted': {'place': 0, 'course': 0, 'food': 0, 'trashbin': 0}
         }
         FirestoreClient.createDocument('users', documentId=telegramId, data=newUser)
 

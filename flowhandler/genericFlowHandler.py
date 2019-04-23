@@ -8,7 +8,6 @@ from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
 from common.placeUtility import findNearestPlace
 from common.constants import taskType, questionType, specialStates, callbackTypes
-from client.telegramClient import dispatcher
 from pprint import pprint
 from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
 from common import logicJumpHelper

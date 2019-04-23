@@ -6,10 +6,11 @@ class User(object):
 
     @staticmethod
     def getUserById(userId):
-        try:
-            return FirestoreClient.getDocument('users', userId, withRef=True)
-        except:
+        user = FirestoreClient.getDocument('users', userId, withRef=True)
+        if user is None:
             return User.createANewUser(userId)
+        else:
+            return user
 
     @staticmethod
     def createANewUser(telegramId):

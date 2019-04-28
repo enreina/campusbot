@@ -1,8 +1,9 @@
 from telegram.ext import Updater, CommandHandler, Filters
 from telegram import ChatAction
+import db.firestoreClient as FirestoreClient
 from db.user import User
 from db.taskInstance import TaskInstance
-from dialoguemanager.response.generalCopywriting import START_MESSAGE
+from dialoguemanager.response.generalCopywriting import START_MESSAGE, LOADING_TASKS_TEXT
 from dialoguemanager.response.taskListCopywriting import SELECT_TASK_INSTRUCTION, NO_TASK_INSTANCES_AVAILABLE
 from flowhandler.createFlowHandler import CreateFlowHandler
 from flowhandler.enrichFlowHandler import EnrichFlowHandler
@@ -24,9 +25,13 @@ class TaskListHandler:
         self.entryCommandHandler = CommandHandler(entryCommand, self._entry_command_callback)
         # create a command handler to create new item
         self.createFlowHandler = CreateFlowHandler(entryCommand, self.itemCollectionName, dispatcher)
+        self.handlersPerUser = {}
+        self.cleanCanonicalName = self.canonicalName.lower().replace(" ", "")
 
     def add_to_dispatcher(self):
         self.dispatcher.add_handler(self.entryCommandHandler)
+        self.load_task_list_persistence()
+        pprint(self.handlersPerUser)
 
     def build_task_list_message(self, user, update, context):
         taskInstances = TaskInstance.get_task_instances_for_user(user, taskInstanceCollectionName=self.taskInstanceCollectionName)
@@ -38,8 +43,7 @@ class TaskListHandler:
             taskPreview = taskInstance['task_preview']
             task = taskInstance.task
             item = task['item']
-            cleanCanonicalName = self.canonicalName.lower().replace(" ", "")
-            command = "{entryCommand}{idx}".format(entryCommand=cleanCanonicalName, idx=idx+1)
+            command = "{entryCommand}{idx}".format(entryCommand=self.cleanCanonicalName, idx=idx+1)
             preview_url = "http://campusbot.cf/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
                 taskPreview=taskPreview,
                 canonicalName=self.canonicalName
@@ -48,31 +52,59 @@ class TaskListHandler:
             messages.append(message)
             # add command handler to dispatcher for this user
             if task['type'] == taskType.TASK_TYPE_ENRICH_ITEM:
-                flowHandler = EnrichFlowHandler(cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance)
+                flowHandler = EnrichFlowHandler(self.cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance)
             elif task['type'] == taskType.TASK_TYPE_VALIDATE_ITEM:
-                flowHandler = ValidateFlowHandler(cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance)
+                flowHandler = ValidateFlowHandler(self.cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance)
         
             flowHandler.add_to_dispatcher(user)
-            context.chat_data['handlers'].append(flowHandler.conversationHandler)
+            self.handlersPerUser[user['telegramId']].append(flowHandler.conversationHandler)
 
             context.chat_data['tasks'][command] = taskInstance
         return messages
 
+    def load_task_list_persistence(self):
+        chat_data = FirestoreClient.getCollection('botChatData', asDict=True)
+        if chat_data is not None:
+            for chatId in chat_data:
+                user = chat_data[chatId]['user']
+                if 'tasks' in chat_data[chatId]:
+                    # add create command handler
+                    self.createFlowHandler.add_to_dispatcher(user)
+                    self.handlersPerUser[user['telegramId']] = [self.createFlowHandler]
+
+                    taskInstances = chat_data[chatId]['tasks']
+                    for command,taskInstance in taskInstances.items():
+                        # only add if this is the corresponding task list handler
+                        if command.startswith(self.entryCommand):
+                            task = taskInstance['task']
+                            if task['type'] == taskType.TASK_TYPE_ENRICH_ITEM:
+                                flowHandler = EnrichFlowHandler(self.cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance)
+                            elif task['type'] == taskType.TASK_TYPE_VALIDATE_ITEM:
+                                flowHandler = ValidateFlowHandler(self.cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance)
+                        
+                            flowHandler.add_to_dispatcher(user)
+                            self.handlersPerUser[user['telegramId']].append(flowHandler.conversationHandler)
+
+
+
     def _entry_command_callback(self, update, context):
-        bot = context.bot
-        chatId = update.message.chat_id
-        userTelegramId = unicode(update.message.from_user.id)
-        context.chat_data['user'] = User.getUserById(userTelegramId)
-        user = context.chat_data['user']
         # don't show list if they are currently in the middle of a task
         if 'currentTaskInstance' in context.chat_data:
             return
+            
+        bot = context.bot
+        chatId = update.message.chat_id
+        bot.send_message(chat_id=chatId, text=LOADING_TASKS_TEXT, parse_mode='Markdown')
+
+        userTelegramId = unicode(update.message.from_user.id)
+        context.chat_data['user'] = User.getUserById(userTelegramId)
+        user = context.chat_data['user']
         # clean command handlers
-        if 'handlers' in context.chat_data:
-            for handler in context.chat_data['handlers']:
+        if userTelegramId in self.handlersPerUser:
+            for handler in self.handlersPerUser[userTelegramId]:
                 self.dispatcher.remove_handler(handler)
-        context.chat_data['handlers'] = []
         self.createFlowHandler.add_to_dispatcher(user)
+        self.handlersPerUser[userTelegramId] = [self.createFlowHandler]
 
         bot.send_chat_action(chatId, ChatAction.TYPING)
         # to do, implement to send list of tasks
@@ -98,7 +130,8 @@ class TaskListHandler:
         context.bot.send_message(chat_id=update.message.chat_id, text="You have selected *{taskTitle}*".format(taskTitle=taskInstance.title), parse_mode='Markdown')
 
         # clean command handlers
-        for handler in context.chat_data['handlers']:
+        for handler in self.handlersPerUser[context.chat_data['user']['telegramId']]:
             self.dispatcher.remove_handler(handler)
+        self.handlersPerUser[context.chat_data['user']['telegramId']] = []
                 
         

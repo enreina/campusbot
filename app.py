@@ -4,8 +4,12 @@ import settings as env
 from dialoguemanager.response import generalCopywriting
 from tasklist.taskListHandler import TaskListHandler
 from startflow.startHandler import StartHandler
+from persistence.campusBotPersistence import CampusBotPersistence
 
-updater = Updater(token=env.TELEGRAM_BOT_TOKEN, use_context=True)
+# create persistence file
+persistenceObject = CampusBotPersistence()
+
+updater = Updater(token=env.TELEGRAM_BOT_TOKEN, persistence=persistenceObject, use_context=True)
 dispatcher = updater.dispatcher
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

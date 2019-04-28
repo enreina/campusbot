@@ -12,10 +12,11 @@ cred = credentials.Certificate(env.FIRESTORE_SERVICE_ACCOUNT_PATH)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-def getCollection(collectionName, populate=False):
+def getCollection(collectionName, populate=False, asDict=False):
     ref = db.collection(collectionName)
     collectedData = ref.get()
     documentsAsList = [x.to_dict() for x in collectedData]
+    documentsAsDict = {}
 
     if populate:
         for doc in documentsAsList:
@@ -23,8 +24,12 @@ def getCollection(collectionName, populate=False):
                 if isinstance(value, DocumentReference):
                     # populate reference
                     doc[key] = value.get().to_dict()
-
-    return documentsAsList
+    if asDict:
+        for x, data in zip(collectedData, documentsAsList):
+            documentsAsDict[x.id] = data
+        return documentsAsDict
+    else:
+        return documentsAsList
 
 def getDocument(collectionName, documentId, populate=False, withRef=False):
     doc_ref = db.collection(collectionName).document(documentId)
@@ -42,12 +47,12 @@ def getDocument(collectionName, documentId, populate=False, withRef=False):
         print(u'No such document!')
         return None
 
-def createDocument(collectionName, documentId=None, data={}):
+def createDocument(collectionName, documentId=None, data={}, merge=False):
     if documentId is not None:
         return saveDocument(collectionName, documentId=documentId, data=data)
     else:
         ref = db.collection(collectionName).document()
-        ref.set(data)
+        ref.set(data, merge=merge)
 
         return ref
 

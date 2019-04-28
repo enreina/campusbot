@@ -24,6 +24,7 @@ class TaskListHandler:
         self.entryCommandHandler = CommandHandler(entryCommand, self._entry_command_callback)
         # create a command handler to create new item
         self.createFlowHandler = CreateFlowHandler(entryCommand, self.itemCollectionName, dispatcher)
+        self.handlersPerUser = {}
 
     def add_to_dispatcher(self):
         self.dispatcher.add_handler(self.entryCommandHandler)
@@ -53,7 +54,10 @@ class TaskListHandler:
                 flowHandler = ValidateFlowHandler(cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance)
         
             flowHandler.add_to_dispatcher(user)
-            context.chat_data['handlers'].append(flowHandler.conversationHandler)
+            if user['telegramId'] in self.handlersPerUser:
+                self.handlersPerUser[user['telegramId']].append(flowHandler.conversationHandler)
+            else:
+                self.handlersPerUser[user['telegramId']] = [flowHandler.conversationHandler]
 
             context.chat_data['tasks'][command] = taskInstance
         return messages
@@ -68,10 +72,9 @@ class TaskListHandler:
         if 'currentTaskInstance' in context.chat_data:
             return
         # clean command handlers
-        if 'handlers' in context.chat_data:
-            for handler in context.chat_data['handlers']:
+        if userTelegramId in self.handlersPerUser:
+            for handler in self.handlersPerUser[userTelegramId]:
                 self.dispatcher.remove_handler(handler)
-        context.chat_data['handlers'] = []
         self.createFlowHandler.add_to_dispatcher(user)
 
         bot.send_chat_action(chatId, ChatAction.TYPING)

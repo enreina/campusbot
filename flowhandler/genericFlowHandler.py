@@ -65,7 +65,7 @@ class GenericFlowHandler(object):
             
             states[questionNumber] = handler
         self.numOfStates = len(self.taskTemplate.questions)
-        conversationName = '{telegramId}'.format(entryCommand=self.entryCommand, telegramId=user['telegramId'])
+        conversationName = '{telegramId}-{entryCommand}'.format(telegramId=user['telegramId'], entryCommand=self.entryCommand)
         self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)], persistent=True, name=conversationName)
 
     def add_to_dispatcher(self, user):

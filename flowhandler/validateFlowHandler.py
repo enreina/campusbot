@@ -46,7 +46,7 @@ class ValidateFlowHandler(GenericFlowHandler):
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance
-        context.chat_data['temporaryAnswer'] = self.taskInstance.task['aggregatedAnswers']
+        context.chat_data['temporaryAnswer'] = self.taskInstance['task']['aggregatedAnswers']
         context.chat_data['temporaryAnswer']['executionStartTime'] = datetime.now(tzlocal())
         questionNumber = super(ValidateFlowHandler, self)._start_task_callback(update, context)
 

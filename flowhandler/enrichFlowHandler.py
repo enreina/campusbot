@@ -2,7 +2,8 @@ from genericFlowHandler import GenericFlowHandler
 from datetime import datetime
 from dateutil.tz import tzlocal
 import db.firestoreClient as FirestoreClient
-from db.course import Course
+from db.taskInstance import TaskInstance
+from db.user import User
 from pprint import pprint
 
 class EnrichFlowHandler(GenericFlowHandler):
@@ -16,6 +17,7 @@ class EnrichFlowHandler(GenericFlowHandler):
     def __init__(self, canonicalName, itemCollectionName, dispatcher, entryCommand, taskInstance):
         taskTemplateId = 'enrich-{canonicalName}'.format(canonicalName=canonicalName.lower())
         self.taskInstance = taskInstance
+        self.canonicalName = canonicalName
         super(EnrichFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName, entryCommand=entryCommand)
 
 
@@ -42,7 +44,16 @@ class EnrichFlowHandler(GenericFlowHandler):
         data['createdAt'] = datetime.now(tzlocal())
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
-        # TO-DO: update task count of user
+        # TO-DO: update taskInstance.completed and task count of user
+        TaskInstance.update_task_instance(taskInstance, {'completed': True})
+        user['totalTasksCompleted'][self.canonicalName.lower()] = user['totalTasksCompleted'][self.canonicalName.lower()] + 1
+        tasksCompleted = user['tasksCompleted']
+        tasksCompleted.append({'activeDate': data['createdAt']})
+        User.updateUser(user['_id'], {
+            'totalTasksCompleted': user['totalTasksCompleted'], 
+            'tasksCompleted': tasksCompleted
+        })
+        
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance

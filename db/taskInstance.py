@@ -44,7 +44,7 @@ class TaskInstance(object):
         else:
             userId = str(user) 
         # get task instances
-        task_instances = FirestoreClient.getDocumentsFromSubcollection('users', userId, taskInstanceCollectionName, limit=limit, orderBy='createdAt', orderDirection=firestore.Query.DESCENDING, withRef=True)
+        task_instances = FirestoreClient.getDocumentsFromSubcollection('users', userId, taskInstanceCollectionName, queries=[('completed','==', False)], limit=limit, orderBy='createdAt', orderDirection=firestore.Query.DESCENDING, withRef=True)
         # populate task inside each task instance
         for task_instance in task_instances:
             task_instance['task'] = task_instance['task'].get().to_dict()
@@ -63,6 +63,11 @@ class TaskInstance(object):
             task_preview[key] = rule.format(task_instance=task_instance)
         
         return task_preview
+
+    @staticmethod
+    def update_task_instance(task_instance, data):
+        taskInstanceRef = task_instance['_ref']
+        taskInstanceRef.update(data)
 
         
 

@@ -4,6 +4,8 @@ from dateutil.tz import tzlocal
 import db.firestoreClient as FirestoreClient
 from db.course import Course
 from pprint import pprint
+from db.taskInstance import TaskInstance
+from db.user import User
 
 class ValidateFlowHandler(GenericFlowHandler):
     '''
@@ -15,6 +17,7 @@ class ValidateFlowHandler(GenericFlowHandler):
     '''
     def __init__(self, canonicalName, itemCollectionName, dispatcher, entryCommand, taskInstance):
         taskTemplateId = 'validate-{canonicalName}'.format(canonicalName=canonicalName.lower())
+        self.canonicalName = canonicalName
         self.taskInstance = taskInstance
         super(ValidateFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName, entryCommand=entryCommand)
 
@@ -43,6 +46,15 @@ class ValidateFlowHandler(GenericFlowHandler):
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
         # TO-DO: update task count of user
+        # TO-DO: update taskInstance.completed and task count of user
+        TaskInstance.update_task_instance(taskInstance, {'completed': True})
+        user['totalTasksCompleted'][self.canonicalName] = user['totalTasksCompleted'][self.canonicalName] + 1
+        tasksCompleted = user['tasksCompleted']
+        tasksCompleted.append({'activeDate': data['createdAt']})
+        User.updateUser(user['_id'], {
+            'totalTasksCompleted': user['totalTasksCompleted'], 
+            'tasksCompleted': tasksCompleted
+        })
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance

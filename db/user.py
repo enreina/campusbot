@@ -25,6 +25,10 @@ class User(object):
         return FirestoreClient.getDocument('users', telegramId, withRef=True)
 
     @staticmethod
+    def updateUser(userId, data):
+        return FirestoreClient.updateDocument('users', userId, data)
+        
+    @staticmethod
     def saveUtterance(telegramId, message, byBot=False, callbackQuery=None):
         utteranceCollection = FirestoreClient.db.collection('users').document(str(telegramId)).collection('utterances')
         messageData = {

@@ -43,6 +43,10 @@ class ValidateFlowHandler(GenericFlowHandler):
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
         # TO-DO: update task count of user
+        # TO-DO: update taskInstance.completed and task count of user
+        TaskInstance.update_task_instance(taskInstance, {'completed': True})
+        user['totalTasksCompleted'][self.canonicalName] = user['totalTasksCompleted'][self.canonicalName] + 1
+        User.updateUser(user['_id'], {'totalTasksCompleted': user['totalTasksCompleted']})
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance

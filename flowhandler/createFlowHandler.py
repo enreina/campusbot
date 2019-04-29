@@ -13,6 +13,7 @@ class CreateFlowHandler(GenericFlowHandler):
         dispatcher: the dispatcher used to handle telegram bot updates
     '''
     def __init__(self, canonicalName, itemCollectionName, dispatcher):
+        self.canonicalName = canonicalName
         taskTemplateId = 'create-{canonicalName}'.format(canonicalName=canonicalName.lower())
         super(CreateFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName)
 

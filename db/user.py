@@ -24,4 +24,22 @@ class User(object):
 
         return FirestoreClient.getDocument('users', telegramId, withRef=True)
 
-    
+    @staticmethod
+    def saveUtterance(telegramId, message, byBot=False, callbackQuery=None):
+        utteranceCollection = FirestoreClient.db.collection('users').document(str(telegramId)).collection('utterances')
+        messageData = {
+            'createdAt': message.date,
+            'byBot': byBot
+        }
+        if message.text:
+            messageData['text']= message.text
+        if message.photo:
+            messageData['photo'] = [unicode(photo.file_id) for photo in message.photo]
+        if message.location:
+            messageData['location'] = {latitude: message.location.latitude, longitude: message.location.longitude}
+        if message.caption:
+            messageData['caption'] = message.caption
+        if callbackQuery is not None:
+            messageData['data'] = callbackQuery.data
+
+        utteranceCollection.document(str(message.message_id)).set(messageData)

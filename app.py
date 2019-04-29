@@ -14,6 +14,7 @@ dispatcher = updater.dispatcher
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # /start handler
 startHandler = StartHandler(dispatcher)
@@ -37,4 +38,6 @@ trashBinTaskListHandler.add_to_dispatcher()
 
 updater.start_webhook(listen='0.0.0.0', port=env.PORT, url_path=env.TELEGRAM_BOT_TOKEN, webhook_url=env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)
 updater.bot.set_webhook(env.NGROK_CAMPUSBOT_URL+'/'+env.TELEGRAM_BOT_TOKEN)
+logger.info("CampusBot is ready")
 updater.idle()
+

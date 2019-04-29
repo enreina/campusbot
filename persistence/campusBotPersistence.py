@@ -49,7 +49,6 @@ class CampusBotPersistence(BasePersistence):
                 if isinstance(conversations[key1], dict):
                     for key2 in conversations[key1]:
                         conversations_dict[(int(key1), int(key2))] = conversations[key1][key2]
-            pprint(conversations_dict)
             return conversations_dict
 
     def flush(self):

@@ -27,3 +27,4 @@ NO_TASK_INSTANCES_AVAILABLE = '''There is no task for *{canonical_name}* right n
 Fancy to try other commands?'''
 
 LOADING_TASKS_TEXT = "Please wait a moment as your tasks are being loaded..⏳"
+END_OF_TASK_TEXT = "Would you like to do another task?"

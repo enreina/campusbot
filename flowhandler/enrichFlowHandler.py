@@ -47,8 +47,13 @@ class EnrichFlowHandler(GenericFlowHandler):
         # TO-DO: update taskInstance.completed and task count of user
         TaskInstance.update_task_instance(taskInstance, {'completed': True})
         user['totalTasksCompleted'][self.canonicalName.lower()] = user['totalTasksCompleted'][self.canonicalName.lower()] + 1
-        User.updateUser(user['_id'], {'totalTasksCompleted': user['totalTasksCompleted']})
-
+        tasksCompleted = user['tasksCompleted']
+        tasksCompleted.append({'activeDate': data['createdAt']})
+        User.updateUser(user['_id'], {
+            'totalTasksCompleted': user['totalTasksCompleted'], 
+            'tasksCompleted': tasksCompleted
+        })
+        
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance

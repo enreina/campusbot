@@ -25,3 +25,5 @@ GENERAL_NOT_SURE_TEXT = "Not sure 🤔"
 
 NO_TASK_INSTANCES_AVAILABLE = '''There is no task for *{canonical_name}* right now 🙁. 
 Fancy to try other commands?'''
+
+LOADING_TASKS_TEXT = "Please wait a moment as your tasks are being loaded..⏳"

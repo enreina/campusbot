@@ -17,8 +17,13 @@ class StartHandler:
         chatId = update.message.chat_id
         userTelegramId = unicode(update.message.from_user.id)
 
-        context.bot.send_message(chat_id=chatId, text=generalCopywriting.WELCOME_MESSAGE, parse_mode='Markdown')
-        context.bot.send_message(chat_id=chatId, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
+        #save user message
+        User.saveUtterance(userTelegramId, update.message)
+
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.WELCOME_MESSAGE, parse_mode='Markdown')
+        User.saveUtterance(userTelegramId, message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
+        User.saveUtterance(userTelegramId, message, byBot=True)
 
         context.chat_data['user'] = User.getUserById(userTelegramId)
 

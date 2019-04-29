@@ -1,4 +1,5 @@
 from db.taskTemplate import TaskTemplate
+from db.user import User
 from db.item import Item
 from db.course import Course
 from db.category import Category
@@ -65,7 +66,8 @@ class GenericFlowHandler(object):
             
             states[questionNumber] = handler
         self.numOfStates = len(self.taskTemplate.questions)
-        self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)])
+        conversationName = '{telegramId}-{entryCommand}'.format(telegramId=user['telegramId'], entryCommand=self.entryCommand)
+        self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)], persistent=True, name=conversationName)
 
     def add_to_dispatcher(self, user):
         self.init_conversation_handler(user)
@@ -152,7 +154,8 @@ class GenericFlowHandler(object):
         else:
             formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
 
-        bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
+        message = bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
+        User.saveUtterance(chatId, message, byBot=True)
 
         return currentQuestionNumber
 
@@ -179,7 +182,8 @@ class GenericFlowHandler(object):
             formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
 
         replyMarkup = {"remove_keyboard": True}
-        context.bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
+        message = context.bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
+        User.saveUtterance(chatId, message, byBot=True)
 
     def save_temporary_answer(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
@@ -264,7 +268,8 @@ class GenericFlowHandler(object):
             formattedClosingStatement = statement.format(item=temporaryAnswer)
 
             replyMarkup = {"remove_keyboard": True}
-            context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
+            message = context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
+            User.saveUtterance(chatId, message, byBot=True)
 
     def save_answers(self, update, context):
         return
@@ -275,6 +280,7 @@ class GenericFlowHandler(object):
         context.chat_data['userId'] = update.message.from_user.id
         context.chat_data['chatId'] = update.message.chat_id
         context.chat_data['currentQuestionNumber'] = 0
+        User.saveUtterance(update.message.from_user.id, update.message)
 
         for statement in self.taskTemplate.openingStatements:
             item = None
@@ -288,7 +294,8 @@ class GenericFlowHandler(object):
                     if 'imageCaption' in statement:
                         caption = statement['imageCaption'].format(item=item)
 
-                    bot.send_photo(chat_id=update.message.chat_id, photo=image, caption=caption, parse_mode='Markdown')
+                    message = bot.send_photo(chat_id=update.message.chat_id, photo=image, caption=caption, parse_mode='Markdown')
+                    User.saveUtterance(update.message.chat_id, message, byBot=True)
                 if 'jumpRules' in statement:
                     jumpRules = statement['jumpRules']
                     shouldJump, jumpIndex = logicJumpHelper.evaluateJumpRules(item, jumpRules)
@@ -296,13 +303,19 @@ class GenericFlowHandler(object):
                     if shouldJump:
                         context.chat_data['currentQuestionNumber'] = jumpIndex
             else:
-                bot.send_message(chat_id=update.message.chat_id, text=statement.format(item=item), parse_mode='Markdown')
-        
+                message = bot.send_message(chat_id=update.message.chat_id, text=statement.format(item=item), parse_mode='Markdown')
+                User.saveUtterance(update.message.chat_id, message, byBot=True)
+
         self.send_current_question(update, context)
         return context.chat_data['currentQuestionNumber']
         
     # individual state callback
     def _question_callback(self, update, context):
+        if update.message:
+            message = update.message
+        else:
+            message = update.callback_query.message
+        User.saveUtterance(message.from_user.id, message, callbackQuery=update.callback_query)
         # save to temporary answer
         self.save_temporary_answer(update, context)
         # send response of current question
@@ -312,6 +325,7 @@ class GenericFlowHandler(object):
 
     # callback for skipping question
     def _skip_question_callback(self, update, context):
+        User.saveUtterance(update.message.from_user.id, update.message)
         # remove any answer from temp answer
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
@@ -378,10 +392,14 @@ class GenericFlowHandler(object):
 
     # fallback
     def _fallbackCallback(self, update, context):
+        telegramId = context.chat_data['user']['telegramId']
+        User.saveUtterance(telegramId, update.message)
+
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         formattedResponseError = currentQuestion['responseError'].format(item=temporaryAnswer)
-        context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
+        message = context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
+        User.saveUtterance(update.message.chat_id, message, byBot=True)
 
         return currentQuestionNumber

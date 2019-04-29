@@ -12,19 +12,31 @@ cred = credentials.Certificate(env.FIRESTORE_SERVICE_ACCOUNT_PATH)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-def getCollection(collectionName, populate=False):
+def getCollection(collectionName, populate=False, asDict=False):
     ref = db.collection(collectionName)
     collectedData = ref.get()
-    documentsAsList = [x.to_dict() for x in collectedData]
 
-    if populate:
-        for doc in documentsAsList:
-            for key,value in doc.items():
-                if isinstance(value, DocumentReference):
-                    # populate reference
-                    doc[key] = value.get().to_dict()
+    if asDict:
+        documentsAsDict = {}
+        for x in collectedData:
+            documentsAsDict[x.id] = x.to_dict()
+            if populate:
+                doc = documentsAsDict[x.id]
+                for key,value in doc.items():
+                    if isinstance(value, DocumentReference):
+                        # populate reference
+                        doc[key] = value.get().to_dict()
+        return documentsAsDict
+    else:
+        documentsAsList = [x.to_dict() for x in collectedData]
+        if populate:
+            for doc in documentsAsList:
+                for key,value in doc.items():
+                    if isinstance(value, DocumentReference):
+                        # populate reference
+                        doc[key] = value.get().to_dict()
+        return documentsAsList
 
-    return documentsAsList
 
 def getDocument(collectionName, documentId, populate=False, withRef=False):
     doc_ref = db.collection(collectionName).document(documentId)
@@ -42,12 +54,12 @@ def getDocument(collectionName, documentId, populate=False, withRef=False):
         print(u'No such document!')
         return None
 
-def createDocument(collectionName, documentId=None, data={}):
+def createDocument(collectionName, documentId=None, data={}, merge=True):
     if documentId is not None:
-        return saveDocument(collectionName, documentId=documentId, data=data)
+        return saveDocument(collectionName, documentId=documentId, data=data, merge=merge)
     else:
         ref = db.collection(collectionName).document()
-        ref.set(data)
+        ref.set(data, merge=merge)
 
         return ref
 

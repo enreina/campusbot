@@ -155,7 +155,7 @@ class GenericFlowHandler(object):
             formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
 
         message = bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
-        User.saveUtterance(chatId, message, byBot=True)
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
         return currentQuestionNumber
 
@@ -183,7 +183,7 @@ class GenericFlowHandler(object):
 
         replyMarkup = {"remove_keyboard": True}
         message = context.bot.send_message(chat_id=chatId, text=formattedResponseOk, reply_markup=replyMarkup, parse_mode='Markdown')
-        User.saveUtterance(chatId, message, byBot=True)
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
     def save_temporary_answer(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
@@ -269,7 +269,7 @@ class GenericFlowHandler(object):
 
             replyMarkup = {"remove_keyboard": True}
             message = context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
-            User.saveUtterance(chatId, message, byBot=True)
+            User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
     def save_answers(self, update, context):
         return
@@ -295,7 +295,7 @@ class GenericFlowHandler(object):
                         caption = statement['imageCaption'].format(item=item)
 
                     message = bot.send_photo(chat_id=update.message.chat_id, photo=image, caption=caption, parse_mode='Markdown')
-                    User.saveUtterance(update.message.chat_id, message, byBot=True)
+                    User.saveUtterance(context.chat_data['userId'], message, byBot=True)
                 if 'jumpRules' in statement:
                     jumpRules = statement['jumpRules']
                     shouldJump, jumpIndex = logicJumpHelper.evaluateJumpRules(item, jumpRules)
@@ -304,7 +304,7 @@ class GenericFlowHandler(object):
                         context.chat_data['currentQuestionNumber'] = jumpIndex
             else:
                 message = bot.send_message(chat_id=update.message.chat_id, text=statement.format(item=item), parse_mode='Markdown')
-                User.saveUtterance(update.message.chat_id, message, byBot=True)
+                User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
         self.send_current_question(update, context)
         return context.chat_data['currentQuestionNumber']
@@ -315,7 +315,7 @@ class GenericFlowHandler(object):
             message = update.message
         else:
             message = update.callback_query.message
-        User.saveUtterance(message.from_user.id, message, callbackQuery=update.callback_query)
+        User.saveUtterance(context.chat_data['userId'], message, callbackQuery=update.callback_query)
         # save to temporary answer
         self.save_temporary_answer(update, context)
         # send response of current question
@@ -392,8 +392,7 @@ class GenericFlowHandler(object):
 
     # fallback
     def _fallbackCallback(self, update, context):
-        telegramId = context.chat_data['user']['telegramId']
-        User.saveUtterance(telegramId, update.message)
+        User.saveUtterance(context.chat_data['userId'], update.message)
 
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         temporaryAnswer = context.chat_data['temporaryAnswer']

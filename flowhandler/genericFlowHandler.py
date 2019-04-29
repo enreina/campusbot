@@ -271,6 +271,12 @@ class GenericFlowHandler(object):
             message = context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
             User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
+        # offer to start other task
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.END_OF_TASK_TEXT, parse_mode='Markdown')
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+
     def save_answers(self, update, context):
         return
             

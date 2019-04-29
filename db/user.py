@@ -18,7 +18,7 @@ class User(object):
             'telegramId': telegramId,
             'createdAt': firestore.SERVER_TIMESTAMP,
             'tasksCompleted': [],
-            'totalTasksCompleted': {'place': 0, 'course': 0, 'food': 0, 'trashbin': 0}
+            'totalTasksCompleted': {'place': 0, 'question': 0, 'food': 0, 'trashbin': 0}
         }
         FirestoreClient.createDocument('users', documentId=telegramId, data=newUser)
 
@@ -27,7 +27,7 @@ class User(object):
     @staticmethod
     def updateUser(userId, data):
         return FirestoreClient.updateDocument('users', userId, data)
-        
+
     @staticmethod
     def saveUtterance(telegramId, message, byBot=False, callbackQuery=None):
         utteranceCollection = FirestoreClient.db.collection('users').document(str(telegramId)).collection('utterances')

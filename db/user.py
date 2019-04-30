@@ -40,7 +40,7 @@ class User(object):
         if message.photo:
             messageData['photo'] = [unicode(photo.file_id) for photo in message.photo]
         if message.location:
-            messageData['location'] = {latitude: message.location.latitude, longitude: message.location.longitude}
+            messageData['location'] = {'latitude': message.location.latitude, 'longitude': message.location.longitude}
         if message.caption:
             messageData['caption'] = message.caption
         if callbackQuery is not None:

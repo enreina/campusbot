@@ -27,6 +27,13 @@ class CreateFlowHandler(GenericFlowHandler):
         data = context.chat_data['temporaryAnswer']
         user = context.chat_data['user']
         for key,value in data.items():
+            if key == 'building' and value is not None:
+                if isinstance(value, str): 
+                    name = value
+                else:
+                    name = value['name']
+                data['buildingName'] = name
+                data['buildingNameLower'] = name.lower()
             if isinstance(value, dict) and '_ref' in value:
                 data[key] = value['_ref']
 

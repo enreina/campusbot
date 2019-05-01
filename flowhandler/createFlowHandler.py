@@ -29,7 +29,7 @@ class CreateFlowHandler(GenericFlowHandler):
         user = context.chat_data['user']
         for key,value in data.items():
             if key == 'building' and value is not None:
-                if isinstance(value, str): 
+                if isinstance(value, basestring): 
                     name = value
                 else:
                     name = value['name']

@@ -15,10 +15,10 @@ class EnrichFlowHandler(GenericFlowHandler):
         canonicalName: name of the use case
         dispatcher: the dispatcher used to handle telegram bot updates
     '''
-    def __init__(self, canonicalName, itemCollectionName, dispatcher, entryCommand, taskInstance):
+    def __init__(self, canonicalName, itemCollectionName, dispatcher, entryCommand, taskInstance, itemCollectionNamePrefix):
         taskTemplateId = 'enrich-{canonicalName}'.format(canonicalName=canonicalName.lower())
         self.taskInstance = taskInstance
-        self.canonicalName = canonicalName
+        self.itemCollectionNamePrefix = itemCollectionNamePrefix
         super(EnrichFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName, entryCommand=entryCommand)
 
 
@@ -47,7 +47,7 @@ class EnrichFlowHandler(GenericFlowHandler):
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
         # TO-DO: update taskInstance.completed and task count of user
         TaskInstance.update_task_instance(taskInstance, {'completed': True})
-        user['totalTasksCompleted'][self.canonicalName.lower()] = user['totalTasksCompleted'][self.canonicalName.lower()] + 1
+        user['totalTasksCompleted'][self.itemCollectionNamePrefix.lower()] = user['totalTasksCompleted'][self.itemCollectionNamePrefix.lower()] + 1
         tasksCompleted = user['tasksCompleted']
         tasksCompleted.append({'activeDate': data['createdAt']})
         User.updateUser(user['_id'], {
@@ -56,7 +56,7 @@ class EnrichFlowHandler(GenericFlowHandler):
         })
 
         # create validation task
-        CampusBotApi.generate_validation_task(self.canonicalName.lower(), userId=user['_id'], enrichmentTaskInstanceId=taskInstance['_id'])
+        CampusBotApi.generate_validation_task(self.itemCollectionNamePrefix.lower(), userId=user['_id'], enrichmentTaskInstanceId=taskInstance['_id'])
         
 
     def _start_task_callback(self, update, context):

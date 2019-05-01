@@ -22,10 +22,11 @@ class TaskListHandler:
         self.itemCollectionName = '{prefix}Items'.format(prefix=itemCollectionNamePrefix)
         self.enrichmentCollectionName = '{prefix}Enrichments'.format(prefix=itemCollectionNamePrefix)
         self.validationCollectionName = '{prefix}Validations'.format(prefix=itemCollectionNamePrefix)
+        self.prefix = itemCollectionNamePrefix
         # create a command handler for entry
         self.entryCommandHandler = CommandHandler(entryCommand, self._entry_command_callback)
         # create a command handler to create new item
-        self.createFlowHandler = CreateFlowHandler(entryCommand, self.itemCollectionName, dispatcher)
+        self.createFlowHandler = CreateFlowHandler(entryCommand, self.itemCollectionName, dispatcher, itemCollectionNamePrefix)
         self.cleanCanonicalName = self.canonicalName.lower().replace(" ", "")
 
     def add_to_dispatcher(self):
@@ -51,9 +52,9 @@ class TaskListHandler:
             messages.append(message)
             # add command handler to dispatcher for this user
             if task['type'] == taskType.TASK_TYPE_ENRICH_ITEM:
-                flowHandler = EnrichFlowHandler(self.cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance)
+                flowHandler = EnrichFlowHandler(self.cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance, self.prefix)
             elif task['type'] == taskType.TASK_TYPE_VALIDATE_ITEM:
-                flowHandler = ValidateFlowHandler(self.cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance)
+                flowHandler = ValidateFlowHandler(self.cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance, self.prefix)
         
             flowHandler.add_to_dispatcher(user)
             handlersPerUser[user['telegramId']].append(flowHandler.conversationHandler)
@@ -77,9 +78,9 @@ class TaskListHandler:
                         for command,taskInstance in taskInstances.items():
                             task = taskInstance['task']
                             if task['type'] == taskType.TASK_TYPE_ENRICH_ITEM:
-                                flowHandler = EnrichFlowHandler(self.cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance)
+                                flowHandler = EnrichFlowHandler(self.cleanCanonicalName, self.enrichmentCollectionName, self.dispatcher, command, taskInstance, self.prefix)
                             elif task['type'] == taskType.TASK_TYPE_VALIDATE_ITEM:
-                                flowHandler = ValidateFlowHandler(self.cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance)
+                                flowHandler = ValidateFlowHandler(self.cleanCanonicalName, self.validationCollectionName, self.dispatcher, command, taskInstance, self.prefix)
                         
                             flowHandler.add_to_dispatcher(user)
                             handlersPerUser[user['telegramId']].append(flowHandler.conversationHandler)

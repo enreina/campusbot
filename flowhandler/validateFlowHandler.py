@@ -15,9 +15,9 @@ class ValidateFlowHandler(GenericFlowHandler):
         canonicalName: name of the use case
         dispatcher: the dispatcher used to handle telegram bot updates
     '''
-    def __init__(self, canonicalName, itemCollectionName, dispatcher, entryCommand, taskInstance):
+    def __init__(self, canonicalName, itemCollectionName, dispatcher, entryCommand, taskInstance, itemCollectionNamePrefix):
         taskTemplateId = 'validate-{canonicalName}'.format(canonicalName=canonicalName.lower())
-        self.canonicalName = canonicalName
+        self.itemCollectionNamePrefix = itemCollectionNamePrefix
         self.taskInstance = taskInstance
         super(ValidateFlowHandler, self).__init__(taskTemplateId, dispatcher, itemCollectionName=itemCollectionName, entryCommand=entryCommand)
 
@@ -48,7 +48,7 @@ class ValidateFlowHandler(GenericFlowHandler):
         # TO-DO: update task count of user
         # TO-DO: update taskInstance.completed and task count of user
         TaskInstance.update_task_instance(taskInstance, {'completed': True})
-        user['totalTasksCompleted'][self.canonicalName] = user['totalTasksCompleted'][self.canonicalName] + 1
+        user['totalTasksCompleted'][self.itemCollectionNamePrefix] = user['totalTasksCompleted'][self.itemCollectionNamePrefix] + 1
         tasksCompleted = user['tasksCompleted']
         tasksCompleted.append({'activeDate': data['createdAt']})
         User.updateUser(user['_id'], {

@@ -10,7 +10,7 @@ import db.firestoreClient as FirestoreClient
 from common.placeUtility import findNearestPlace
 from common.constants import taskType, questionType, specialStates, callbackTypes, confirmationStatementTypes
 from pprint import pprint
-from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
+from common.inlineKeyboardHelper import buildInlineKeyboardMarkup, buildTextOfChoiceList, buildRegexFilter, buildAnswerDict
 from common import logicJumpHelper
 import re
 import settings as env
@@ -55,9 +55,22 @@ class GenericFlowHandler(object):
                 handler.append(MessageHandler(Filters.regex(regexRule), self._question_callback))
             elif question['type'] in questionType.TEXT_BASED_QUESTION_TYPES:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
-            elif question['type'] in questionType.INLINE_BUTTON_BASED_QUESTION_TYPES:
-                handler.append(CallbackQueryHandler(self._question_callback))
-            
+            elif question['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
+                itemCategory = self.taskTemplate.itemCategory
+                subcategories = Category.getSubcategories(itemCategory)
+                buttonRows = [{"buttons": [{'text': subcategory['name'], 'value': subcategory['_id']}]} for subcategory in subcategories]
+                question['buttonRows'] = buttonRows
+                regexRule = buildRegexFilter(buttonRows)
+                handler.append(MessageHandler(Filters.regex(regexRule), self._question_callback))
+                question['answerDict'] = buildAnswerDict(buttonRows)
+            elif question['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
+                handler.append(MessageHandler(Filters.text, self._question_callback))
+            elif question['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS or question['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
+                regexRule = buildRegexFilter(question['buttonRows'])
+                question['answerDict'] = buildAnswerDict(question['buttonRows'])
+                handler.append(MessageHandler(Filters.regex(regexRule), self._question_callback))
+                
+
             if question['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
 
@@ -99,6 +112,7 @@ class GenericFlowHandler(object):
             chatId = update.message.chat_id
 
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+        choiceText = None
 
         if currentQuestion['type'] == questionType.QUESTION_TYPE_LOCATION:
             replyMarkup = {"keyboard": [[{"text": generalCopywriting.SEND_LOCATION_TEXT, "request_location": True}]]}
@@ -110,10 +124,12 @@ class GenericFlowHandler(object):
             # find nearby places
             nearbyPlaces = findNearestPlace(geolocation['latitude'], geolocation['longitude'], itemCategory=currentQuestion['choiceItemCategory'])
             # construct keyboard for reply
-            buttonRows = [[buttonRow] for buttonRow in nearbyPlaces]
-            buttonRows.append([{'text': generalCopywriting.NOT_IN_A_BUILDING, 'value': None}])
-            currentQuestion['buttonRows'] = buttonRows
-            replyMarkup = buildInlineKeyboardMarkup(buttonRows, withNotSureOption=True)
+            buttonRows = [{'buttons':[buttonRow]} for buttonRow in nearbyPlaces]
+            buttonRows.append({'buttons':[{'text': generalCopywriting.NOT_IN_A_BUILDING, 'value': None}]})
+            replyMarkup = {"remove_keyboard": True}
+            
+            # add choice to question text
+            choiceText = buildTextOfChoiceList(buttonRows, withNotSureOption=True, withNumber=False)
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_YES),
                         InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NO_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_NO)],
@@ -122,18 +138,12 @@ class GenericFlowHandler(object):
 
             replyMarkup = InlineKeyboardMarkup(keyboard)
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
-            # load subcategory
-            itemCategory = self.taskTemplate.itemCategory
-            subcategories = Category.getSubcategories(itemCategory)
-            # build inline button
-            buttonRows = []
-            for subcategory in subcategories:
-                buttonRows.append([{'value': subcategory['_id'], 'text': subcategory['name']}])
-            buttonRows.append([{'value': callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE, 'text': generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT}])
-            currentQuestion['buttonRows'] = buttonRows
-            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
-        elif currentQuestion['type'] in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION]:
-            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
+            replyMarkup = {"remove_keyboard": True}
+            choiceText = buildTextOfChoiceList(currentQuestion['buttonRows'], withNotSureOption=True)
+        elif currentQuestion['type'] in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION]::
+            replyMarkup = {"remove_keyboard": True}
+            # add choice to question text
+            choiceText = buildTextOfChoiceList(currentQuestion['buttonRows'], withNotSureOption=False)
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
             temporaryAnswer['doesCourseExist'] = False
             course = Course.find_course_by_name(temporaryAnswer['courseName'])
@@ -141,7 +151,8 @@ class GenericFlowHandler(object):
             if course is None:
                 return self.move_to_next_question(update, context)
             temporaryAnswer['course'] = course
-            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
+            replyMarkup = {"remove_keyboard": True}
+            choiceText = buildTextOfChoiceList(currentQuestion['buttonRows'], withNotSureOption=False)
         else:
             replyMarkup = {"remove_keyboard": True}
 
@@ -198,7 +209,10 @@ class GenericFlowHandler(object):
 
         message = bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
         User.saveUtterance(context.chat_data['userId'], message, byBot=True)
-
+        if choiceText is not None:
+            message = bot.send_message(chat_id=chatId, text=choiceText, reply_markup=replyMarkup, parse_mode='Markdown')
+            User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+        
         return currentQuestionNumber
 
     def send_current_question_response(self, update, context):
@@ -284,15 +298,13 @@ class GenericFlowHandler(object):
         elif typeOfQuestion in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             answer = update.callback_query.data
         elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
-            callbackData = json.loads(update.callback_query.data)
-            callbackData = callbackData['value']
+            callbackData = currentQuestion['answerDict'][update.message.text.lower().strip()]
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
                 answer = subcategory     
                 temporaryAnswer['categoryName'] = subcategory['name']
         elif typeOfQuestion in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_CHECK_COURSE]:
-            callbackData = json.loads(update.callback_query.data)
-            answer = callbackData['value']
+            answer = currentQuestion['answerDict'][update.message.text.lower().strip()]
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if update.message:
                 answer = update.message.text

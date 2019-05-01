@@ -5,6 +5,7 @@ import db.firestoreClient as FirestoreClient
 from db.course import Course
 from db.user import User
 from pprint import pprint
+import common.campusbotApi as CampusBotApi
 
 class CreateFlowHandler(GenericFlowHandler):
     '''
@@ -47,7 +48,7 @@ class CreateFlowHandler(GenericFlowHandler):
                     data['courseCode'] = None
                 data['course'] = Course.find_or_create_course_ref(data['courseCode'], data['courseName'])
 
-        FirestoreClient.saveDocument(self.itemCollectionName, data=data)
+        newItem = FirestoreClient.saveDocument(self.itemCollectionName, data=data)
         # update tasks completed
         user['totalTasksCompleted'][self.canonicalName.lower()] = user['totalTasksCompleted'][self.canonicalName.lower()] + 1
         tasksCompleted = user['tasksCompleted']
@@ -56,6 +57,10 @@ class CreateFlowHandler(GenericFlowHandler):
             'totalTasksCompleted': user['totalTasksCompleted'], 
             'tasksCompleted': tasksCompleted
         })
+
+        # create enrichment task
+        CampusBotApi.generate_enrichment_task(self.canonicalName.lower(), itemId=newItem.get().id)
+        
 
     def _start_task_callback(self, update, context):
         questionNumber = super(CreateFlowHandler, self)._start_task_callback(update, context)

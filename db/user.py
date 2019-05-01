@@ -1,6 +1,7 @@
 import datetime
 import firestoreClient as FirestoreClient
 from google.cloud import firestore
+import common.campusbotApi as CampusBotApi
 
 class User(object):
 
@@ -21,6 +22,12 @@ class User(object):
             'totalTasksCompleted': {'place': 0, 'question': 0, 'food': 0, 'trashbin': 0}
         }
         FirestoreClient.createDocument('users', documentId=telegramId, data=newUser)
+
+        # assign task to new user
+        CampusBotApi.assign_task_to_user('place', telegramId)
+        CampusBotApi.assign_task_to_user('question', telegramId)
+        CampusBotApi.assign_task_to_user('food', telegramId)
+        CampusBotApi.assign_task_to_user('trashbin', telegramId)
 
         return FirestoreClient.getDocument('users', telegramId, withRef=True)
 

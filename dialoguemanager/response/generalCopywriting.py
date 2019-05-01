@@ -11,11 +11,7 @@ START_MESSAGE = '''Try one of these commands to start:
 /help - learn more about this chatbot
 '''
 
-HELP_MESSAGE = '''Greetings!
-
-Thank you for participating in this experiment. 
-
-CampusBot is a chatbot that has been built to collect data from students of TU Delft for experimental purposes. It consists of four different domains namely: *Food*, *Place*, *Courses* and *TrashBin*.
+HELP_MESSAGE = '''CampusBot is a chatbot that has been built to collect data from students of TU Delft for experimental purposes. It consists of four different domains namely: *Food*, *Place*, *Courses* and *TrashBin*.
 
 1. /food - Share a picture of your meal and also assess and identify items in other pictures.
 2. /place - Upload information about several types of places on the TU Delft campus, for example, a study space, a lecture room or a parking space. Also add more information and validate an existing place.

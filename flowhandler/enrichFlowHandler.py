@@ -5,6 +5,7 @@ import db.firestoreClient as FirestoreClient
 from db.taskInstance import TaskInstance
 from db.user import User
 from pprint import pprint
+import common.campusbotApi as CampusBotApi
 
 class EnrichFlowHandler(GenericFlowHandler):
     '''
@@ -53,6 +54,9 @@ class EnrichFlowHandler(GenericFlowHandler):
             'totalTasksCompleted': user['totalTasksCompleted'], 
             'tasksCompleted': tasksCompleted
         })
+
+        # create validation task
+        CampusBotApi.generate_validation_task(self.canonicalName.lower(), userId=user['_id'], enrichmentTaskInstanceId=taskInstance['_id'])
         
 
     def _start_task_callback(self, update, context):

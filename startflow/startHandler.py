@@ -8,9 +8,10 @@ class StartHandler:
         self.dispatcher = dispatcher
         # create a command handler for entry
         self.start_command_handler = CommandHandler('start', self._start_callback)
-
+        self.help_command_handler = CommandHandler('help', self._help_callback)
     def add_to_dispatcher(self):
         self.dispatcher.add_handler(self.start_command_handler)
+        self.dispatcher.add_handler(self.help_command_handler)
 
     def _start_callback(self, update, context):
         bot = context.bot
@@ -26,4 +27,15 @@ class StartHandler:
         User.saveUtterance(userTelegramId, message, byBot=True)
 
         context.chat_data['user'] = User.getUserById(userTelegramId)
+
+    def _help_callback(self, update, context):
+        bot = context.bot
+        chatId = update.message.chat_id
+        userTelegramId = unicode(update.message.from_user.id)
+
+        #save user message
+        User.saveUtterance(userTelegramId, update.message)
+
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.HELP_MESSAGE, parse_mode='Markdown')
+        User.saveUtterance(userTelegramId, message, byBot=True)
 

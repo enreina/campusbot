@@ -73,7 +73,6 @@ def buildRegexFilter(buttonRows):
             idx = idx + 1
             matchesList.append(str(idx))
             matchesList.append(button['text'].encode('ascii', 'ignore').strip())
-    print(matchesList)
     return re.compile("^\s*({matches})\s*$".format(matches="|".join(matchesList)), re.I)
 
 def buildAnswerDict(buttonRows):

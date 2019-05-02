@@ -38,13 +38,13 @@ TASK_PREVIEW_RULES = {
 
 class TaskInstance(object):
     @staticmethod
-    def get_task_instances_for_user(user, taskInstanceCollectionName='placeTaskInstances', limit=5):
+    def get_task_instances_for_user(user, taskInstanceCollectionName='placeTaskInstances'):
         if type(user) == dict:
             userId = str(user['_id'])
         else:
             userId = str(user) 
         # get task instances
-        task_instances = FirestoreClient.getDocumentsFromSubcollection('users', userId, taskInstanceCollectionName, queries=[('completed','==', False), ('expired', '==', False)], limit=limit, orderBy='createdAt', orderDirection=firestore.Query.ASCENDING, withRef=True)
+        task_instances = FirestoreClient.getDocumentsFromSubcollection('users', userId, taskInstanceCollectionName, queries=[('completed','==', False), ('expired', '==', False)], orderBy='createdAt', orderDirection=firestore.Query.ASCENDING, withRef=True)
         # populate task inside each task instance
         for task_instance in task_instances:
             task_instance['task'] = task_instance['task'].get().to_dict()

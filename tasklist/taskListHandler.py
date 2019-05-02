@@ -38,12 +38,19 @@ class TaskListHandler:
         messages = []
         context.chat_data['tasks'] = {}
 
-        for idx,taskInstance in enumerate(taskInstances):
+        # add refresh handler
+        self.add_refresh_command_handler(user)
+        offset = context.chat_data.get('task_list_offset', 0)
+        if offset > len(taskInstances):
+            offset = 0
+            context.chat_data['task_list_offset'] = 0
+
+        for idx,taskInstance in enumerate(taskInstances[offset:offset+5]):
             # build message
             taskPreview = taskInstance['task_preview']
             task = taskInstance.task
             item = task['item']
-            command = "{entryCommand}{idx}".format(entryCommand=self.cleanCanonicalName, idx=idx+1)
+            command = "{entryCommand}{idx}".format(entryCommand=self.cleanCanonicalName, idx=idx+1+offset)
             preview_url = "http://campusbot.cf/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
                 taskPreview=taskPreview,
                 canonicalName=self.canonicalName
@@ -60,6 +67,7 @@ class TaskListHandler:
             handlersPerUser[user['telegramId']].append(flowHandler.conversationHandler)
 
             context.chat_data['tasks'][command] = taskInstance
+
         return messages
 
     def load_task_list_persistence(self):
@@ -74,6 +82,9 @@ class TaskListHandler:
                         self.createFlowHandler.add_to_dispatcher(user)
                         handlersPerUser[user['telegramId']] = [self.createFlowHandler.conversationHandler]
 
+                        # add refresh handler
+                        self.add_refresh_command_handler(user)
+
                         taskInstances = user_chat_data['tasks']
                         for command,taskInstance in taskInstances.items():
                             task = taskInstance['task']
@@ -84,8 +95,6 @@ class TaskListHandler:
                         
                             flowHandler.add_to_dispatcher(user)
                             handlersPerUser[user['telegramId']].append(flowHandler.conversationHandler)
-
-
 
     def _entry_command_callback(self, update, context):
         userTelegramId = unicode(update.message.from_user.id)
@@ -112,9 +121,17 @@ class TaskListHandler:
         self.createFlowHandler.add_to_dispatcher(user)
         handlersPerUser[userTelegramId] = [self.createFlowHandler.conversationHandler]
         context.chat_data['current_task_list'] = unicode(self.canonicalName)
+        # reset task offset
+        context.chat_data['task_list_offset'] = 0
+
+        self.send_task_list_message(update, context)
         
+    def send_task_list_message(self, update, context): 
+        userTelegramId = unicode(update.message.from_user.id)
+        bot = context.bot
+        chatId = update.message.chat_id
+        user = context.chat_data['user']
         bot.send_chat_action(chatId, ChatAction.TYPING)
-        # to do, implement to send list of tasks
         messageOfTaskInstances = self.build_task_list_message(user, update, context)
         for message in messageOfTaskInstances:
             bot.send_chat_action(chatId, ChatAction.TYPING)
@@ -130,19 +147,17 @@ class TaskListHandler:
             message = bot.send_message(chat_id=chatId, text=SELECT_TASK_INSTRUCTION.format(canonicalName=self.canonicalName), parse_mode='Markdown')
             User.saveUtterance(userTelegramId, message, byBot=True)
 
-    def _select_task_callback(self, update, context):
-        for entity in update.message.entities:
-            if entity.type == 'bot_command':
-                command = update.message.text[entity.offset+1:entity.offset+entity.length]
-                break
-        taskInstance = context.chat_data['tasks'][command]
-        
-        # TO-DO create task executioner
-        context.bot.send_message(chat_id=update.message.chat_id, text="You have selected *{taskTitle}*".format(taskTitle=taskInstance.title), parse_mode='Markdown')
+    def _refresh_command_callback(self, update, context):
+        userTelegramId = unicode(update.message.from_user.id)
+        User.saveUtterance(userTelegramId, update.message)
 
-        # clean command handlers
-        for handler in handlersPerUser[context.chat_data['user']['telegramId']]:
-            self.dispatcher.remove_handler(handler)
-        handlersPerUser[context.chat_data['user']['telegramId']] = []
+        context.chat_data['task_list_offset'] = context.chat_data.get('task_list_offset', 0) + 5
+        self.send_task_list_message(update, context)
+
+    def add_refresh_command_handler(self, user):
+        # add refresh handler
+        refreshCommandHandler = CommandHandler("refresh", self._refresh_command_callback, filters=Filters.user(int(user['telegramId'])))
+        self.dispatcher.add_handler(refreshCommandHandler)
+        handlersPerUser[user['telegramId']].append(refreshCommandHandler)
                 
         

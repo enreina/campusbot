@@ -23,6 +23,7 @@ class User(object):
             'totalTasksCompleted': {'place': 0, 'question': 0, 'food': 0, 'trashbin': 0},
             'preferredLocationNames': [],
             'preferredCourses': [],
+            'chatbotv2': True
         }
         newUser.update(userDetails)
         FirestoreClient.createDocument('users', documentId=telegramId, data=newUser)

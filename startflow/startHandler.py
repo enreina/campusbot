@@ -9,14 +9,22 @@ class StartHandler:
         # create a command handler for entry
         self.start_command_handler = CommandHandler('start', self._start_callback)
         self.help_command_handler = CommandHandler('help', self._help_callback)
+        self.quit_command_handler = CommandHandler('quit', self._quit_callback)
+        
     def add_to_dispatcher(self):
         self.dispatcher.add_handler(self.start_command_handler)
         self.dispatcher.add_handler(self.help_command_handler)
+        self.dispatcher.add_handler(self.quit_command_handler)
 
     def _start_callback(self, update, context):
         bot = context.bot
         chatId = update.message.chat_id
         userTelegramId = unicode(update.message.from_user.id)
+
+        if 'currentTaskInstance' in context.chat_data:
+            message = bot.send_message(chat_id=chatId, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
+            User.saveUtterance(userTelegramId, message, byBot=True)
+            return
 
         #save user message
         User.saveUtterance(userTelegramId, update.message)
@@ -38,4 +46,18 @@ class StartHandler:
 
         message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.HELP_MESSAGE, parse_mode='Markdown')
         User.saveUtterance(userTelegramId, message, byBot=True)
+
+    def _quit_callback(self, update, context):
+        User.saveUtterance(context.chat_data['userId'], update.message)
+        chatId = update.message.chat_id
+
+        if 'currentTaskInstance' in context.chat_data:
+            del context.chat_data['currentTaskInstance']
+
+        # offer to start other task
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.END_OF_TASK_TEXT, parse_mode='Markdown')
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+        
 

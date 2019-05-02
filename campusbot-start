@@ -12,9 +12,9 @@ curl -X POST \
   -d '{
   "addr":  "'"$BOT_PORT"'",
   "proto": "http",
-  "name": "campusbot"
+  "name": "campusbotv2"
 }'
-export NGROK_CAMPUSBOT_URL="$(curl --silent --show-error http://127.0.0.1:4040/api/tunnels/campusbot | sed -nE 's/.*public_url":"([^"]*).*/\1/p')"
+export NGROK_CAMPUSBOT_URL="$(curl --silent --show-error http://127.0.0.1:4040/api/tunnels/campusbotv2 | sed -nE 's/.*public_url":"([^"]*).*/\1/p')"
 source venv/bin/activate
 python app.py
 

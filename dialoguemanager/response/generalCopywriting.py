@@ -46,3 +46,5 @@ Fancy to try other commands?'''
 
 LOADING_TASKS_TEXT = "Please wait a moment as your tasks are being loaded..⏳"
 END_OF_TASK_TEXT = "Would you like to do another task?"
+
+INSTRUCTION_TO_QUIT_TASK_TEXT = "If you want to end this current task without submitting your answers, type /quit"

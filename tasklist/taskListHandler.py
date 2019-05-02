@@ -3,7 +3,7 @@ from telegram import ChatAction
 import db.firestoreClient as FirestoreClient
 from db.user import User
 from db.taskInstance import TaskInstance
-from dialoguemanager.response.generalCopywriting import START_MESSAGE, LOADING_TASKS_TEXT
+from dialoguemanager.response.generalCopywriting import START_MESSAGE, LOADING_TASKS_TEXT, INSTRUCTION_TO_QUIT_TASK_TEXT
 from dialoguemanager.response.taskListCopywriting import SELECT_TASK_INSTRUCTION, NO_TASK_INSTANCES_AVAILABLE
 from flowhandler.createFlowHandler import CreateFlowHandler
 from flowhandler.enrichFlowHandler import EnrichFlowHandler
@@ -90,12 +90,15 @@ class TaskListHandler:
     def _entry_command_callback(self, update, context):
         userTelegramId = unicode(update.message.from_user.id)
         User.saveUtterance(userTelegramId, update.message)
-        # don't show list if they are currently in the middle of a task
-        if 'currentTaskInstance' in context.chat_data:
-            return
-            
+
         bot = context.bot
         chatId = update.message.chat_id
+        
+        # don't show list if they are currently in the middle of a task
+        if 'currentTaskInstance' in context.chat_data:
+            message = bot.send_message(chat_id=chatId, text=INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
+            User.saveUtterance(userTelegramId, message, byBot=True)
+            return
 
         message = bot.send_message(chat_id=chatId, text=LOADING_TASKS_TEXT, parse_mode='Markdown')
         User.saveUtterance(userTelegramId, message, byBot=True)

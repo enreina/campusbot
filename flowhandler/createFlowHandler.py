@@ -35,6 +35,14 @@ class CreateFlowHandler(GenericFlowHandler):
                     name = value['name']
                 data['buildingName'] = name
                 data['buildingNameLower'] = name.lower()
+
+            if key == 'locationDescription' and 'buildingName' in data and 'floorNumber' in data:
+                data['locationDescription'] = '{locationDescription} in {buildingName} on floor {floorNumber}'.format(
+                    locationDescription=data['locationDescription'],
+                    buildingName=data['buildingName'],
+                    floorNumber=data['floorNumber']
+                ) 
+
             if isinstance(value, dict) and '_ref' in value:
                 data[key] = value['_ref']
 

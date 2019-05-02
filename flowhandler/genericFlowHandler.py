@@ -66,8 +66,12 @@ class GenericFlowHandler(object):
             
             states[questionNumber] = handler
         self.numOfStates = len(self.taskTemplate.questions)
+        # fallback
+        fallbackHandlers = [CommandHandler('quit', self._quit_task_callback)]
+        fallbackHandlers.append(MessageHandler(Filters.all, self._fallbackCallback))
+        
         conversationName = '{telegramId}-{entryCommand}'.format(telegramId=user['telegramId'], entryCommand=self.entryCommand)
-        self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=[MessageHandler(Filters.all, self._fallbackCallback)], persistent=True, name=conversationName)
+        self.conversationHandler = ConversationHandler(entry_points=entryPoints, states=states, fallbacks=fallbackHandlers, persistent=True, name=conversationName)
 
     def add_to_dispatcher(self, user):
         self.init_conversation_handler(user)
@@ -407,4 +411,26 @@ class GenericFlowHandler(object):
         message = context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
         User.saveUtterance(update.message.chat_id, message, byBot=True)
 
+        message = context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
+        User.saveUtterance(update.message.chat_id, message, byBot=True)
+
         return currentQuestionNumber
+
+    # quit task
+    def _quit_task_callback(self, update, context):
+        User.saveUtterance(context.chat_data['userId'], update.message)
+
+        if 'currentTaskInstance' in context.chat_data:
+            del context.chat_data['currentTaskInstance']
+        self.remove_from_dispatcher()
+
+        chatId = update.message.chat_id
+
+        # offer to start other task
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.END_OF_TASK_TEXT, parse_mode='Markdown')
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
+        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+
+        return ConversationHandler.END
+

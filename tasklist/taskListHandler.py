@@ -41,7 +41,7 @@ class TaskListHandler:
         # add refresh handler
         self.add_refresh_command_handler(user)
         offset = context.chat_data.get('task_list_offset', 0)
-        if offset > len(taskInstances):
+        if offset >= len(taskInstances):
             offset = 0
             context.chat_data['task_list_offset'] = 0
 

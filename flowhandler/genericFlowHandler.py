@@ -299,6 +299,7 @@ class GenericFlowHandler(object):
             answer = update.callback_query.data
         elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
             cleanResponse = update.message.text.lower().encode('ascii', 'ignore').strip()
+            cleanResponse = re.sub(r'(^\W+)|(\W+$)', '',cleanResponse)
             callbackData = currentQuestion['answerDict'][cleanResponse]
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
@@ -306,6 +307,7 @@ class GenericFlowHandler(object):
                 temporaryAnswer['categoryName'] = subcategory['name']
         elif typeOfQuestion in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_CHECK_COURSE]:
             cleanResponse = update.message.text.lower().encode('ascii', 'ignore').strip()
+            cleanResponse = re.sub(r'(^\W+)|(\W+$)', '',cleanResponse)
             answer = currentQuestion['answerDict'][cleanResponse]
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if update.message:

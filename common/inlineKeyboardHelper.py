@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import json 
 from dialoguemanager.response import generalCopywriting
@@ -46,26 +47,26 @@ def buildTextOfChoiceList(buttonRows, withNotSureOption=False, withNumber=True):
         for button in buttonRow['buttons']:
             idx = idx + 1
             if withNumber:
-                message = '''{message}{num}. {choice}\n'''.format(message=message, num=str(idx), choice=button['text'])
+                message = u'''{message}{num}. {choice}\n'''.format(message=message, num=str(idx), choice=button['text'])
             else:
-                message = '''{message}- {choice}\n'''.format(message=message, choice=button['text'])
+                message = u'''{message}- {choice}\n'''.format(message=message, choice=button['text'])
     
     if withNotSureOption:
         idx = idx + 1
         if withNumber:
-            message = '''{message}{num}. {choice}\n'''.format(message=message, num=str(idx), choice=generalCopywriting.GENERAL_NOT_SURE_TEXT)
+            message = u'''{message}{num}. {choice}\n'''.format(message=message, num=str(idx), choice=generalCopywriting.GENERAL_NOT_SURE_TEXT_NO_EMOJI)
         else:
-            message = '''{message}- {choice}\n'''.format(message=message, choice=generalCopywriting.GENERAL_NOT_SURE_TEXT)
+            message = u'''{message}- {choice}\n'''.format(message=message, choice=generalCopywriting.GENERAL_NOT_SURE_TEXT_NO_EMOJI)
 
     
     if withNumber:
-        message = '''{message}\n_You can choose the answer by typing the number or the answer_'''.format(message=message)
+        message = u'''{message}\n_You can choose the answer by typing the number or the answer_'''.format(message=message)
     else:
-        message = '''{message}\n_You can choose the answer by typing the answer_'''.format(message=message)
+        message = u'''{message}\n_You can choose the answer by typing the answer_'''.format(message=message)
     
     return message
 
-def buildRegexFilter(buttonRows):
+def buildRegexFilter(buttonRows, withNotSureOption=False):
     matchesList = []
     idx = 0
     for buttonRow in buttonRows:
@@ -73,9 +74,18 @@ def buildRegexFilter(buttonRows):
             idx = idx + 1
             matchesList.append(str(idx))
             matchesList.append(button['text'].encode('ascii', 'ignore').strip())
-    return re.compile("^\s*({matches})\s*$".format(matches="|".join(matchesList)), re.I)
+            customRegexList = button.get('customRegexList', [])
+            for customRegex in customRegexList:
+                matchesList.append(customRegex)
 
-def buildAnswerDict(buttonRows):
+    if withNotSureOption:
+        idx = idx+1
+        matchesList.append(str(idx))
+        matchesList.append(generalCopywriting.GENERAL_NOT_SURE_TEXT_NO_EMOJI.encode('ascii', 'ignore').strip())
+        
+    return re.compile("^\W*({matches})\W*$".format(matches="|".join(matchesList)), re.I)
+
+def buildAnswerDict(buttonRows, withNotSureOption=False):
     answerDict = {}
     idx = 0
     for buttonRow in buttonRows:
@@ -88,6 +98,14 @@ def buildAnswerDict(buttonRows):
             if text != textWithoutEmoji:
                 answerDict[text] = button['value']
 
+            customRegexList = button.get('customRegexList', [])
+            for customRegex in customRegexList:
+                answerDict[customRegex] = button['value']
+
+    if withNotSureOption:
+        idx = idx+1
+        answerDict[str(idx)] = callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE
+        answerDict[generalCopywriting.GENERAL_NOT_SURE_TEXT_NO_EMOJI.lower().strip()] = callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE
 
     return answerDict
 

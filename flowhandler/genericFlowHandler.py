@@ -60,9 +60,9 @@ class GenericFlowHandler(object):
                 subcategories = Category.getSubcategories(itemCategory)
                 buttonRows = [{"buttons": [{'text': subcategory['name'], 'value': subcategory['_id']}]} for subcategory in subcategories]
                 question['buttonRows'] = buttonRows
-                regexRule = buildRegexFilter(buttonRows)
+                regexRule = buildRegexFilter(buttonRows, withNotSureOption=True)
                 handler.append(MessageHandler(Filters.regex(regexRule), self._question_callback))
-                question['answerDict'] = buildAnswerDict(buttonRows)
+                question['answerDict'] = buildAnswerDict(buttonRows, withNotSureOption=True)
             elif question['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
             elif question['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS or question['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
@@ -251,7 +251,7 @@ class GenericFlowHandler(object):
             return
         
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
-            if temporaryAnswer[currentQuestion['property']] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE or temporaryAnswer[currentQuestion['property']] is None:
+            if 'category' not in temporaryAnswer or temporaryAnswer['category'] is None:
                 formattedResponseOk = currentQuestion['responseNotSure']
             elif 'responseOk' in currentQuestion:
                 formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
@@ -298,13 +298,15 @@ class GenericFlowHandler(object):
         elif typeOfQuestion in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             answer = update.callback_query.data
         elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
-            callbackData = currentQuestion['answerDict'][update.message.text.lower().strip()]
+            cleanResponse = update.message.text.lower().encode('ascii', 'ignore').strip()
+            callbackData = currentQuestion['answerDict'][cleanResponse]
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
                 answer = subcategory     
                 temporaryAnswer['categoryName'] = subcategory['name']
         elif typeOfQuestion in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_CHECK_COURSE]:
-            answer = currentQuestion['answerDict'][update.message.text.lower().strip()]
+            cleanResponse = update.message.text.lower().encode('ascii', 'ignore').strip()
+            answer = currentQuestion['answerDict'][cleanResponse]
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if update.message:
                 answer = update.message.text

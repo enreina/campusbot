@@ -48,3 +48,12 @@ LOADING_TASKS_TEXT = "Please wait a moment as your tasks are being loaded..⏳"
 END_OF_TASK_TEXT = "Would you like to do another task?"
 
 INSTRUCTION_TO_QUIT_TASK_TEXT = "If you want to end this current task without submitting your answers, type /quit"
+
+PUSH_NOTIF_MESSAGE_TEXT = "We have some new tasks assigned to you, do you want to work on them?"
+PUSH_NOTIF_RESPONSE_YES_TEXT = "YES"
+PUSH_NOTIF_RESPONSE_NO_TEXT = "NO"
+PUSH_NOTIF_RESPONSE_YES_CALLBACK = "PUSH_NOTIF_RESPONSE_YES"
+PUSH_NOTIF_RESPONSE_NO_CALLBACK = "PUSH_NOTIF_RESPONSE_NO"
+PUSH_NOTIF_RESPONSE_PATTERN = r"{yes}|{no}".format(yes=PUSH_NOTIF_RESPONSE_YES_CALLBACK, no=PUSH_NOTIF_RESPONSE_NO_CALLBACK)
+
+PUSH_NOTIF_RESPONSE_FOR_NO = "Okay! If you ever want to do the tasks, you can type /start"

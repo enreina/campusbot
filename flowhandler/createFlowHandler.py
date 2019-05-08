@@ -37,7 +37,7 @@ class CreateFlowHandler(GenericFlowHandler):
                 data['buildingNameLower'] = name.lower()
 
             if key == 'locationDescription' and 'buildingName' in data and 'floorNumber' in data:
-                data['locationDescription'] = '{locationDescription} in {buildingName} on floor {floorNumber}'.format(
+                data['locationDescription'] = u'{locationDescription} in {buildingName} on floor {floorNumber}'.format(
                     locationDescription=data['locationDescription'],
                     buildingName=data['buildingName'],
                     floorNumber=data['floorNumber']

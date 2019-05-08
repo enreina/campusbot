@@ -61,10 +61,10 @@ class StartHandler:
     def _push_notif_handler(self, update, context):
         bot = context.bot
         chatId = update.callback_query.message.chat_id
-        messageId = update.callback_query.message.chat_id.message_id
+        messageId = update.callback_query.message.message_id
         userTelegramId = unicode(update.callback_query.message.chat_id)
         bot.answer_callback_query(update.callback_query.id)
-        edit_message_reply_markup(chat_id=chatId, message_id=messageId, reply_markup=None)
+        bot.edit_message_reply_markup(chat_id=chatId, message_id=messageId, reply_markup=None)
         
         user = User.getUserById(userTelegramId)
         context.chat_data['user'] = user

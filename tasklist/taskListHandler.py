@@ -98,6 +98,20 @@ class TaskListHandler:
 
     def _entry_command_callback(self, update, context):
         userTelegramId = unicode(update.message.from_user.id)
+        chat = update.message.chat
+        userDetails = {}
+
+        if hasattr(chat, 'username'):
+            userDetails['username'] = chat.username
+
+        if hasattr(chat, 'first_name'):
+            userDetails['firstName'] = chat.first_name
+        
+        if hasattr(chat, 'last_name'):
+            userDetails['lastName'] = chat.last_name
+
+        context.chat_data['user'] = User.getUserById(userTelegramId, userDetails)
+
         User.saveUtterance(userTelegramId, update.message)
 
         bot = context.bot
@@ -111,8 +125,7 @@ class TaskListHandler:
 
         message = bot.send_message(chat_id=chatId, text=LOADING_TASKS_TEXT, parse_mode='Markdown')
         User.saveUtterance(userTelegramId, message, byBot=True)
-
-        context.chat_data['user'] = User.getUserById(userTelegramId)
+        
         user = context.chat_data['user']
         # clean command handlers
         if userTelegramId in handlersPerUser:

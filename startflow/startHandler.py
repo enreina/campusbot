@@ -20,6 +20,17 @@ class StartHandler:
         bot = context.bot
         chatId = update.message.chat_id
         userTelegramId = unicode(update.message.from_user.id)
+        chat = update.message.chat
+        userDetails = {}
+
+        if hasattr(chat, 'username'):
+            userDetails['username'] = chat.username
+
+        if hasattr(chat, 'first_name'):
+            userDetails['firstName'] = chat.first_name
+        
+        if hasattr(chat, 'last_name'):
+            userDetails['lastName'] = chat.last_name
 
         if 'currentTaskInstance' in context.chat_data:
             message = bot.send_message(chat_id=chatId, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
@@ -34,7 +45,7 @@ class StartHandler:
         message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.START_MESSAGE, parse_mode='Markdown')
         User.saveUtterance(userTelegramId, message, byBot=True)
 
-        context.chat_data['user'] = User.getUserById(userTelegramId)
+        context.chat_data['user'] = User.getUserById(userTelegramId, userDetails=userDetails)
 
     def _help_callback(self, update, context):
         bot = context.bot
@@ -50,8 +61,11 @@ class StartHandler:
     def _push_notif_handler(self, update, context):
         bot = context.bot
         chatId = update.callback_query.message.chat_id
+        messageId = update.callback_query.message.chat_id.message_id
         userTelegramId = unicode(update.callback_query.message.chat_id)
         bot.answer_callback_query(update.callback_query.id)
+        edit_message_reply_markup(chat_id=chatId, message_id=messageId, reply_markup=None)
+        
         user = User.getUserById(userTelegramId)
         context.chat_data['user'] = user
 

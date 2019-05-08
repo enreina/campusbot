@@ -6,21 +6,22 @@ import common.campusbotApi as CampusBotApi
 class User(object):
 
     @staticmethod
-    def getUserById(userId):
+    def getUserById(userId, userDetails={}):
         user = FirestoreClient.getDocument('users', userId, withRef=True)
         if user is None:
-            return User.createANewUser(userId)
+            return User.createANewUser(userId, userDetails)
         else:
             return user
 
     @staticmethod
-    def createANewUser(telegramId):
+    def createANewUser(telegramId, userDetails={}):
         newUser = {
             'telegramId': telegramId,
             'createdAt': firestore.SERVER_TIMESTAMP,
             'tasksCompleted': [],
             'totalTasksCompleted': {'place': 0, 'question': 0, 'food': 0, 'trashbin': 0}
         }
+        newUser.update(userDetails)
         FirestoreClient.createDocument('users', documentId=telegramId, data=newUser)
 
         # assign task to new user

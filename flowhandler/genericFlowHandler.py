@@ -124,11 +124,12 @@ class GenericFlowHandler(object):
             itemCategory = self.taskTemplate.itemCategory
             subcategories = Category.getSubcategories(itemCategory)
             # build inline button
-            keyboardItems = []
+            buttonRows = []
             for subcategory in subcategories:
-                keyboardItems.append([InlineKeyboardButton(subcategory['name'], callback_data=subcategory['_id'])])
-            keyboardItems.append([InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)])
-            replyMarkup = InlineKeyboardMarkup(keyboardItems)
+                buttonRows.append([{'value': subcategory['_id'], 'text': subcategory['name']}])
+            buttonRows.append([{'value': callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE, 'text': generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT}])
+            currentQuestion['buttonRows'] = buttonRows
+            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
@@ -166,15 +167,34 @@ class GenericFlowHandler(object):
     def send_current_question_response(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
             context.bot.answer_callback_query(update.callback_query.id)
+            messageId = update.callback_query.message.message_id
+            # remove buttons
+            withNotSureOption = currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM
+            replyMarkupDisabled = buildInlineKeyboardMarkup(currentQuestion['buttonRows'], withNotSureOption=withNotSureOption, disabled=True)
+            context.bot.edit_message_reply_markup(chat_id=chatId, message_id=messageId, reply_markup=replyMarkupDisabled)
         else:
             chatId = update.message.chat_id
-        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
 
-        if 'responseOk' not in currentQuestion or currentQuestion['property'] not in temporaryAnswer:
+        if currentQuestion['property'] not in temporaryAnswer:
+            return
+
+        # get response based on response button
+        for buttonRow in currentQuestion.get('buttonRows', []):
+            if isinstance(buttonRow, dict):
+                buttons = buttonRow.get('buttons', [])
+            else:
+                buttons = buttonRow
+
+            for button in buttons:
+                if button['value'] == temporaryAnswer[currentQuestion['property']] and 'response' in button:
+                    currentQuestion['responseOk'] = button['response']
+
+        if 'responseOk' not in currentQuestion:
             return
         
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
@@ -220,7 +240,8 @@ class GenericFlowHandler(object):
         elif typeOfQuestion in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             answer = update.callback_query.data
         elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
-            callbackData = update.callback_query.data
+            callbackData = json.loads(update.callback_query.data)
+            callbackData = callbackData['value']
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
                 answer = subcategory     
@@ -325,6 +346,10 @@ class GenericFlowHandler(object):
             message = update.message
         else:
             message = update.callback_query.message
+            if update.callback_query.data == callbackTypes.DISABLED_BUTTON:
+                context.bot.answer_callback_query(update.callback_query.id)
+                return self._fallbackCallback(update, context)
+        
         User.saveUtterance(context.chat_data['userId'], message, callbackQuery=update.callback_query)
         # save to temporary answer
         self.save_temporary_answer(update, context)
@@ -402,17 +427,22 @@ class GenericFlowHandler(object):
 
     # fallback
     def _fallbackCallback(self, update, context):
-        User.saveUtterance(context.chat_data['userId'], update.message)
+        if update.message:
+            chatId = update.message.chat_id
+            User.saveUtterance(context.chat_data['userId'], update.message)
+        else:
+            chatId = update.callback_query.message.chat_id
+            User.saveUtterance(context.chat_data['userId'], update.callback_query.message)
 
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         formattedResponseError = currentQuestion['responseError'].format(item=temporaryAnswer)
-        message = context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
-        User.saveUtterance(update.message.chat_id, message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=formattedResponseError, parse_mode='Markdown')
+        User.saveUtterance(chatId, message, byBot=True)
 
-        message = context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
-        User.saveUtterance(update.message.chat_id, message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
+        User.saveUtterance(chatId, message, byBot=True)
 
         return currentQuestionNumber
 

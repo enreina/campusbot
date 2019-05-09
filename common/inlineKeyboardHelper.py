@@ -3,7 +3,7 @@ import json
 from dialoguemanager.response import generalCopywriting
 from common.constants import callbackTypes
 
-def buildInlineKeyboardMarkup(buttonRows, withNotSureOption=False):
+def buildInlineKeyboardMarkup(buttonRows, withNotSureOption=False, disabled=False):
     keyboardItems = []
     for buttonRow in buttonRows:
         inlineKeyboardButtonRow = []
@@ -14,12 +14,18 @@ def buildInlineKeyboardMarkup(buttonRows, withNotSureOption=False):
             buttons = buttonRow
         
         for button in buttons:
-            callbackDataInJson = json.dumps({'value': button['value']})
+            if disabled:
+                callbackDataInJson = callbackTypes.DISABLED_BUTTON
+            else:
+                callbackDataInJson = json.dumps({'value': button['value']})
             inlineKeyboardButtonRow.append(InlineKeyboardButton(button['text'], callback_data=callbackDataInJson))
         keyboardItems.append(inlineKeyboardButtonRow)
 
     if withNotSureOption:
-        callbackDataInJson = json.dumps({'value': callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE})
+        if disabled:
+            callbackDataInJson = callbackTypes.DISABLED_BUTTON
+        else:
+            callbackDataInJson = json.dumps({'value': callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE})
         keyboardItems.append([InlineKeyboardButton(generalCopywriting.GENERAL_NOT_SURE_TEXT, callback_data=callbackDataInJson)])
 
     return InlineKeyboardMarkup(keyboardItems)

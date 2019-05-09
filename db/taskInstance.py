@@ -4,6 +4,7 @@ from bunch import Bunch
 from common.constants.taskType import TASK_TYPE_AS_STRING
 from firebase_admin import firestore
 from pprint import pprint
+import urllib
 
 TASK_PREVIEW_RULES = {
     'placeTaskInstances': {
@@ -60,7 +61,11 @@ class TaskInstance(object):
         task_preview = {}
         rules = TASK_PREVIEW_RULES[taskInstanceCollectionName]
         for key,rule in rules.items():
-            task_preview[key] = rule.format(task_instance=task_instance)
+            if key == 'imageurl':
+                task_preview[key] = urllib.quote(rule.format(task_instance=task_instance))
+            else:
+                task_preview[key] = rule.format(task_instance=task_instance)
+            
         
         return task_preview
 

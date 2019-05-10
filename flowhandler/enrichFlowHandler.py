@@ -35,6 +35,15 @@ class EnrichFlowHandler(GenericFlowHandler):
             propertyName = question['property']
             if propertyName in temporaryAnswer:
                 value = temporaryAnswer[propertyName]
+                
+                if propertyName == 'building' and value is not None:
+                    if isinstance(value, basestring): 
+                        name = value
+                    else:
+                        name = value['name']
+                    data['buildingName'] = name
+                    data['buildingNameLower'] = name.lower()
+
                 if isinstance(value, dict) and '_ref' in value:
                     data[propertyName] = value['_ref']
                 else:
@@ -54,6 +63,18 @@ class EnrichFlowHandler(GenericFlowHandler):
             'totalTasksCompleted': user['totalTasksCompleted'], 
             'tasksCompleted': tasksCompleted
         })
+
+        if 'buildingName' in temporaryAnswer:
+            User.updatePreferredLocationNames(
+                user['_id'],
+                temporaryAnswer['buildingName'].lower()
+            )
+
+        if 'courseName' in temporaryAnswer:
+            User.updatePreferredCourses(
+                user['_id'],
+                temporaryAnswer['courseName'].lower()
+            )
 
         # create validation task
         CampusBotApi.generate_validation_task(self.itemCollectionNamePrefix.lower(), userId=user['_id'], enrichmentTaskInstanceId=taskInstance['_id'])

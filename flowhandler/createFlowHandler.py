@@ -28,6 +28,9 @@ class CreateFlowHandler(GenericFlowHandler):
         data = context.chat_data['temporaryAnswer']
         user = context.chat_data['user']
         for key,value in data.items():
+            if key == 'name' and value is not None:
+                data['nameLower'] = data['name'].lower()
+
             if key == 'building' and value is not None:
                 if isinstance(value, basestring): 
                     name = value
@@ -65,6 +68,17 @@ class CreateFlowHandler(GenericFlowHandler):
             'totalTasksCompleted': user['totalTasksCompleted'], 
             'tasksCompleted': tasksCompleted
         })
+
+        if 'buildingNameLower' in data:
+            User.updatePreferredLocationNames(
+                user['_id'],
+                data['buildingNameLower']
+            )
+        if 'courseName' in data:
+            User.updatePreferredCourses(
+                user['_id'],
+                data['courseName'].lower()
+            )
 
         # create enrichment task
         CampusBotApi.generate_enrichment_task(self.itemCollectionNamePrefix.lower(), itemId=newItem.get().id)

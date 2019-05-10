@@ -56,6 +56,17 @@ class ValidateFlowHandler(GenericFlowHandler):
             'tasksCompleted': tasksCompleted
         })
 
+        if 'building' in temporaryAnswer:
+            User.updatePreferredLocationNames(
+                user['_id'],
+                temporaryAnswer['building'].lower()
+            )
+        if 'courseName' in temporaryAnswer:
+            User.updatePreferredCourses(
+                user['_id'],
+                temporaryAnswer['courseName'].lower()
+            )
+
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance
         context.chat_data['temporaryAnswer'] = self.taskInstance['task']['aggregatedAnswers']

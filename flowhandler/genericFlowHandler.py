@@ -149,12 +149,14 @@ class GenericFlowHandler(object):
             for prop in currentQuestion['mustHaveProperties']:
                 if prop not in temporaryAnswer or temporaryAnswer[prop] is None:
                     return self.move_to_next_question(update, context)
-
+        
         if 'multiItemPropertyName' in currentQuestion:
             # handle question with multiple input
             if 'currentItemIndex' not in context.chat_data:
                 context.chat_data['currentItemIndex'] = 0
             currentItemIndex = context.chat_data['currentItemIndex']
+            if currentItemIndex >= len(temporaryAnswer[currentQuestion['multiItemPropertyName']]):
+                return self.move_to_next_question(update, context)
             item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
             formattedQuestion = currentQuestion['text'].format(item=item, idx=currentItemIndex+1)
         else:
@@ -176,9 +178,8 @@ class GenericFlowHandler(object):
             messageId = update.callback_query.message.message_id
             # disable buttons
             withNotSureOption = currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM
-            selectedAnswer = temporaryAnswer.get(currentQuestion['property'], None)
-            if isinstance(selectedAnswer, dict) and '_id' in selectedAnswer:
-                selectedAnswer = selectedAnswer['_id']
+            callbackData = json.loads(update.callback_query.data)
+            selectedAnswer = callbackData['value']
             replyMarkupDisabled = buildInlineKeyboardMarkup(currentQuestion['buttonRows'], withNotSureOption=withNotSureOption, disabled=True, selectedAnswer=selectedAnswer)
             context.bot.edit_message_reply_markup(chat_id=chatId, message_id=messageId, reply_markup=replyMarkupDisabled)
         else:
@@ -403,7 +404,6 @@ class GenericFlowHandler(object):
             currentItemIndex = context.chat_data['currentItemIndex']
             currentItemIndex = currentItemIndex + 1
             temporaryAnswer = context.chat_data['temporaryAnswer']
-
             if currentItemIndex >= len(temporaryAnswer[currentQuestion['multiItemPropertyName']]):
                 del context.chat_data['currentItemIndex']
             else:

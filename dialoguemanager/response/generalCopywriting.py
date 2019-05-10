@@ -57,3 +57,5 @@ PUSH_NOTIF_RESPONSE_NO_CALLBACK = "PUSH_NOTIF_RESPONSE_NO"
 PUSH_NOTIF_RESPONSE_PATTERN = r"{yes}|{no}".format(yes=PUSH_NOTIF_RESPONSE_YES_CALLBACK, no=PUSH_NOTIF_RESPONSE_NO_CALLBACK)
 
 PUSH_NOTIF_RESPONSE_FOR_NO = "Okay! If you ever want to do the tasks, you can type /start"
+
+NOT_IN_A_BUILDING = "Not in a building"

@@ -110,7 +110,8 @@ class GenericFlowHandler(object):
             nearbyPlaces = findNearestPlace(geolocation['latitude'], geolocation['longitude'], itemCategory=currentQuestion['choiceItemCategory'])
             # construct keyboard for reply
             buttonRows = [[buttonRow] for buttonRow in nearbyPlaces]
-            buttonRows.append([{'text': 'Not in a building', 'value': None}])
+            buttonRows.append([{'text': generalCopywriting.NOT_IN_A_BUILDING, 'value': None}])
+            currentQuestion['buttonRows'] = buttonRows
             replyMarkup = buildInlineKeyboardMarkup(buttonRows, withNotSureOption=True)
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_YES),
@@ -124,11 +125,12 @@ class GenericFlowHandler(object):
             itemCategory = self.taskTemplate.itemCategory
             subcategories = Category.getSubcategories(itemCategory)
             # build inline button
-            keyboardItems = []
+            buttonRows = []
             for subcategory in subcategories:
-                keyboardItems.append([InlineKeyboardButton(subcategory['name'], callback_data=subcategory['_id'])])
-            keyboardItems.append([InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT, callback_data=callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE)])
-            replyMarkup = InlineKeyboardMarkup(keyboardItems)
+                buttonRows.append([{'value': subcategory['_id'], 'text': subcategory['name']}])
+            buttonRows.append([{'value': callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE, 'text': generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT}])
+            currentQuestion['buttonRows'] = buttonRows
+            replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
             replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
@@ -147,12 +149,14 @@ class GenericFlowHandler(object):
             for prop in currentQuestion['mustHaveProperties']:
                 if prop not in temporaryAnswer or temporaryAnswer[prop] is None:
                     return self.move_to_next_question(update, context)
-
+        
         if 'multiItemPropertyName' in currentQuestion:
             # handle question with multiple input
             if 'currentItemIndex' not in context.chat_data:
                 context.chat_data['currentItemIndex'] = 0
             currentItemIndex = context.chat_data['currentItemIndex']
+            if currentItemIndex >= len(temporaryAnswer[currentQuestion['multiItemPropertyName']]):
+                return self.move_to_next_question(update, context)
             item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
             formattedQuestion = currentQuestion['text'].format(item=item, idx=currentItemIndex+1)
         else:
@@ -166,15 +170,36 @@ class GenericFlowHandler(object):
     def send_current_question_response(self, update, context):
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         
         if update.callback_query:
             chatId = update.callback_query.message.chat_id
             context.bot.answer_callback_query(update.callback_query.id)
+            messageId = update.callback_query.message.message_id
+            # disable buttons
+            withNotSureOption = currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM
+            callbackData = json.loads(update.callback_query.data)
+            selectedAnswer = callbackData['value']
+            replyMarkupDisabled = buildInlineKeyboardMarkup(currentQuestion['buttonRows'], withNotSureOption=withNotSureOption, disabled=True, selectedAnswer=selectedAnswer)
+            context.bot.edit_message_reply_markup(chat_id=chatId, message_id=messageId, reply_markup=replyMarkupDisabled)
         else:
             chatId = update.message.chat_id
-        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
 
-        if 'responseOk' not in currentQuestion or currentQuestion['property'] not in temporaryAnswer:
+        if currentQuestion['property'] not in temporaryAnswer:
+            return
+
+        # get response based on response button
+        for buttonRow in currentQuestion.get('buttonRows', []):
+            if isinstance(buttonRow, dict):
+                buttons = buttonRow.get('buttons', [])
+            else:
+                buttons = buttonRow
+
+            for button in buttons:
+                if button['value'] == temporaryAnswer[currentQuestion['property']] and 'response' in button:
+                    currentQuestion['responseOk'] = button['response']
+
+        if 'responseOk' not in currentQuestion:
             return
         
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
@@ -220,7 +245,8 @@ class GenericFlowHandler(object):
         elif typeOfQuestion in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             answer = update.callback_query.data
         elif typeOfQuestion == questionType.QUESTION_TYPE_CATEGORIZATION:
-            callbackData = update.callback_query.data
+            callbackData = json.loads(update.callback_query.data)
+            callbackData = callbackData['value']
             if callbackData != callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
                 subcategory = Category.getCategoryById(callbackData)
                 answer = subcategory     
@@ -231,13 +257,19 @@ class GenericFlowHandler(object):
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if update.message:
                 answer = update.message.text
+                if propertyName == 'building':
+                    temporaryAnswer['buildingName'] = answer 
             else:
                 callbackData = json.loads(update.callback_query.data)
                 if callbackData['value'] is None:
                     answer = None
+                    if propertyName == 'building':
+                        temporaryAnswer['buildingName'] = generalCopywriting.NOT_IN_A_BUILDING
                 elif callbackData['value'] != callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE:
                     item = Item.getItemById(callbackData['value'], 'placeItems')
-                    answer = item     
+                    answer = item
+                    if propertyName == 'building':
+                        temporaryAnswer['buildingName'] = item['name']     
 
         if 'multiItemPropertyName' in currentQuestion:
             # handle question with multiple input
@@ -325,6 +357,10 @@ class GenericFlowHandler(object):
             message = update.message
         else:
             message = update.callback_query.message
+            if update.callback_query.data == callbackTypes.DISABLED_BUTTON:
+                context.bot.answer_callback_query(update.callback_query.id)
+                return self._fallbackCallback(update, context)
+        
         User.saveUtterance(context.chat_data['userId'], message, callbackQuery=update.callback_query)
         # save to temporary answer
         self.save_temporary_answer(update, context)
@@ -368,7 +404,6 @@ class GenericFlowHandler(object):
             currentItemIndex = context.chat_data['currentItemIndex']
             currentItemIndex = currentItemIndex + 1
             temporaryAnswer = context.chat_data['temporaryAnswer']
-
             if currentItemIndex >= len(temporaryAnswer[currentQuestion['multiItemPropertyName']]):
                 del context.chat_data['currentItemIndex']
             else:
@@ -402,17 +437,22 @@ class GenericFlowHandler(object):
 
     # fallback
     def _fallbackCallback(self, update, context):
-        User.saveUtterance(context.chat_data['userId'], update.message)
+        if update.message:
+            chatId = update.message.chat_id
+            User.saveUtterance(context.chat_data['userId'], update.message)
+        else:
+            chatId = update.callback_query.message.chat_id
+            User.saveUtterance(context.chat_data['userId'], update.callback_query.message)
 
         currentQuestionNumber = context.chat_data['currentQuestionNumber']
         temporaryAnswer = context.chat_data['temporaryAnswer']
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         formattedResponseError = currentQuestion['responseError'].format(item=temporaryAnswer)
-        message = context.bot.send_message(chat_id=update.message.chat_id, text=formattedResponseError, parse_mode='Markdown')
-        User.saveUtterance(update.message.chat_id, message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=formattedResponseError, parse_mode='Markdown')
+        User.saveUtterance(chatId, message, byBot=True)
 
-        message = context.bot.send_message(chat_id=update.message.chat_id, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
-        User.saveUtterance(update.message.chat_id, message, byBot=True)
+        message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
+        User.saveUtterance(chatId, message, byBot=True)
 
         return currentQuestionNumber
 

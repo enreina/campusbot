@@ -110,7 +110,8 @@ class GenericFlowHandler(object):
             nearbyPlaces = findNearestPlace(geolocation['latitude'], geolocation['longitude'], itemCategory=currentQuestion['choiceItemCategory'])
             # construct keyboard for reply
             buttonRows = [[buttonRow] for buttonRow in nearbyPlaces]
-            buttonRows.append([{'text': 'Not in a building', 'value': None}])
+            buttonRows.append([{'text': generalCopywriting.NOT_IN_A_BUILDING, 'value': None}])
+            currentQuestion['buttonRows'] = buttonRows
             replyMarkup = buildInlineKeyboardMarkup(buttonRows, withNotSureOption=True)
         elif currentQuestion['type'] in questionType.SINGLE_VALIDATION_QUESTION_TYPES:
             keyboard = [[InlineKeyboardButton(generalCopywriting.VALIDATE_ANSWER_YES_TEXT, callback_data=callbackTypes.VALIDATION_ANSWER_TYPE_YES),
@@ -173,9 +174,12 @@ class GenericFlowHandler(object):
             chatId = update.callback_query.message.chat_id
             context.bot.answer_callback_query(update.callback_query.id)
             messageId = update.callback_query.message.message_id
-            # remove buttons
+            # disable buttons
             withNotSureOption = currentQuestion['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM
-            replyMarkupDisabled = buildInlineKeyboardMarkup(currentQuestion['buttonRows'], withNotSureOption=withNotSureOption, disabled=True)
+            selectedAnswer = temporaryAnswer.get(currentQuestion['property'], None)
+            if isinstance(selectedAnswer, dict) and '_id' in selectedAnswer:
+                selectedAnswer = selectedAnswer['_id']
+            replyMarkupDisabled = buildInlineKeyboardMarkup(currentQuestion['buttonRows'], withNotSureOption=withNotSureOption, disabled=True, selectedAnswer=selectedAnswer)
             context.bot.edit_message_reply_markup(chat_id=chatId, message_id=messageId, reply_markup=replyMarkupDisabled)
         else:
             chatId = update.message.chat_id
@@ -252,13 +256,19 @@ class GenericFlowHandler(object):
         elif typeOfQuestion == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
             if update.message:
                 answer = update.message.text
+                if propertyName == 'building':
+                    temporaryAnswer['buildingName'] = answer 
             else:
                 callbackData = json.loads(update.callback_query.data)
                 if callbackData['value'] is None:
                     answer = None
+                    if propertyName == 'building':
+                        temporaryAnswer['buildingName'] = generalCopywriting.NOT_IN_A_BUILDING
                 elif callbackData['value'] != callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE:
                     item = Item.getItemById(callbackData['value'], 'placeItems')
-                    answer = item     
+                    answer = item
+                    if propertyName == 'building':
+                        temporaryAnswer['buildingName'] = item['name']     
 
         if 'multiItemPropertyName' in currentQuestion:
             # handle question with multiple input

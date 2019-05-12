@@ -32,6 +32,9 @@ class StartHandler:
         if hasattr(chat, 'last_name'):
             userDetails['lastName'] = chat.last_name
 
+        if len(context.args) > 0:
+            userDetails['uniqueId'] = context.args[0]
+
         if 'currentTaskInstance' in context.chat_data:
             message = bot.send_message(chat_id=chatId, text=generalCopywriting.INSTRUCTION_TO_QUIT_TASK_TEXT, parse_mode='Markdown')
             User.saveUtterance(userTelegramId, message, byBot=True)

@@ -27,6 +27,10 @@ class CreateFlowHandler(GenericFlowHandler):
     def save_answers(self, update, context):
         data = context.chat_data['temporaryAnswer']
         user = context.chat_data['user']
+
+        if data.get('isDuplicate', False):
+            return
+            
         for key,value in data.items():
             if key == 'name' and value is not None:
                 data['nameLower'] = data['name'].lower()

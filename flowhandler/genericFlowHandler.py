@@ -144,6 +144,10 @@ class GenericFlowHandler(object):
         else:
             replyMarkup = {"remove_keyboard": True}
 
+        # if the question is to theck duplicate
+        if 'duplicateCheckProperties' in currentQuestion:
+            return self.check_duplicate_item(update, context)
+
         # check must have properties
         if 'mustHaveProperties' in currentQuestion:
             for prop in currentQuestion['mustHaveProperties']:
@@ -224,6 +228,8 @@ class GenericFlowHandler(object):
 
         if typeOfQuestion == questionType.QUESTION_TYPE_TEXT:
             answer = update.message.text
+            if propertyName == 'name':
+                temporaryAnswer['nameLower'] = answer.lower()
         elif typeOfQuestion == questionType.QUESTION_TYPE_NUMBER:
             try:
                 answer = int(update.message.text)
@@ -258,18 +264,21 @@ class GenericFlowHandler(object):
             if update.message:
                 answer = update.message.text
                 if propertyName == 'building':
-                    temporaryAnswer['buildingName'] = answer 
+                    temporaryAnswer['buildingName'] = answer
+                    temporaryAnswer['buildingNameLower'] = answer.lower() 
             else:
                 callbackData = json.loads(update.callback_query.data)
                 if callbackData['value'] is None:
                     answer = None
                     if propertyName == 'building':
                         temporaryAnswer['buildingName'] = generalCopywriting.NOT_IN_A_BUILDING
+                        temporaryAnswer['buildingNameLower'] = generalCopywriting.NOT_IN_A_BUILDING.lower()
                 elif callbackData['value'] != callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE:
                     item = Item.getItemById(callbackData['value'], 'placeItems')
                     answer = item
                     if propertyName == 'building':
-                        temporaryAnswer['buildingName'] = item['name']     
+                        temporaryAnswer['buildingName'] = item['name']
+                        temporaryAnswer['buildingNameLower'] = item['name'].lower()      
 
         if 'multiItemPropertyName' in currentQuestion:
             # handle question with multiple input
@@ -289,7 +298,12 @@ class GenericFlowHandler(object):
                     temporaryAnswer[propertyName] = [answer]
         else:
             temporaryAnswer[propertyName] = answer
-        
+
+        if temporaryAnswer.get('isDuplicate', False) and 'duplicateItem' in temporaryAnswer:
+            temporaryAnswer = temporaryAnswer['duplicateItem'].toDict()
+            temporaryAnswer['isDuplicate'] = True
+            context.chat_data['temporaryAnswer'] = temporaryAnswer
+
         pprint(temporaryAnswer)
     
     def send_closing_statements(self, update, context):
@@ -316,6 +330,73 @@ class GenericFlowHandler(object):
     def save_answers(self, update, context):
         return
             
+    def check_duplicate_item(self, update, context):
+        temporaryAnswer = context.chat_data['temporaryAnswer']
+        currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+        bot = context.bot
+        chatId = context.chat_data['chatId']
+
+        # build query to check duplicate
+        queries = []
+        for propertyName in currentQuestion['duplicateCheckProperties']:
+            answer = temporaryAnswer[propertyName]
+            if isinstance(answer, dict) and '_ref' in answer:
+                answer = answer['_ref']
+            queries.append((propertyName, '==', answer))
+        potentialDuplicates = FirestoreClient.getDocuments(collectionName=self.itemCollectionName, queries=queries)
+
+        # select the last one from duplicate
+        if potentialDuplicates:
+            duplicateItem = potentialDuplicates[-1]
+            temporaryAnswer['duplicateItem'] = duplicateItem
+            # send question
+            if isinstance(currentQuestion['text'], list):
+                for idx,statement in enumerate(currentQuestion['text']):
+                    if idx == (len(currentQuestion['text']) - 1):
+                        replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
+                    else:
+                        replyMarkup = None
+
+                    if isinstance(statement, dict):
+                        if 'imagePropertyName' in statement:
+                            image = duplicateItem[statement['imagePropertyName']]
+                            caption=None
+                            if 'imageCaption' in statement:
+                                caption = statement['imageCaption'].format(duplicateItem=duplicateItem)
+
+                            message = bot.send_photo(chat_id=chatId, photo=image, caption=caption, reply_markup=replyMarkup, parse_mode='Markdown')
+                            User.saveUtterance(chatId, message, byBot=True)
+                        else:
+                            formattedText = statement.format(item=temporaryAnswer, duplicateItem=duplicateItem)
+                            message = bot.send_message(
+                                chat_id=chatId, 
+                                text=formattedText, 
+                                reply_markup=replyMarkup, 
+                                parse_mode='Markdown')
+                            User.saveUtterance(chatId, message, byBot=True)
+                    else:
+                        formattedText = statement.format(item=temporaryAnswer, duplicateItem=duplicateItem)
+                        message = bot.send_message(
+                            chat_id=chatId,
+                            text=formattedText,
+                            reply_markup=replyMarkup,
+                            parse_mode='Markdown')
+                        User.saveUtterance(chatId, message, byBot=True)
+
+            else:
+                replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
+                formattedText = currentQuestion['text'].format(item=temporaryAnswer, duplicateItem=duplicateItem)
+                message = bot.send_message(
+                    chat_id=chatId,
+                    text=formattedText,
+                    reply_markup=replyMarkup,
+                    parse_mode='Markdown')
+                User.saveUtterance(chatId, message, byBot=True)
+            return currentQuestionNumber
+        else:
+            return self.move_to_next_question(update, context)
+        
     # callbacks
     def _start_task_callback(self, update, context):
         bot = context.bot

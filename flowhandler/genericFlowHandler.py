@@ -428,6 +428,7 @@ class GenericFlowHandler(object):
         currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
         bot = context.bot
         chatId = context.chat_data['chatId']
+        choiceText = buildTextOfChoiceList(currentQuestion['buttonRows'], withNotSureOption=False)
 
         # build query to check duplicate
         queries = []
@@ -445,11 +446,6 @@ class GenericFlowHandler(object):
             # send question
             if isinstance(currentQuestion['text'], list):
                 for idx,statement in enumerate(currentQuestion['text']):
-                    if idx == (len(currentQuestion['text']) - 1):
-                        replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
-                    else:
-                        replyMarkup = None
-
                     if isinstance(statement, dict):
                         if 'imagePropertyName' in statement:
                             image = duplicateItem[statement['imagePropertyName']]
@@ -457,14 +453,14 @@ class GenericFlowHandler(object):
                             if 'imageCaption' in statement:
                                 caption = statement['imageCaption'].format(duplicateItem=duplicateItem)
 
-                            message = bot.send_photo(chat_id=chatId, photo=image, caption=caption, reply_markup=replyMarkup, parse_mode='Markdown')
+                            message = bot.send_photo(chat_id=chatId, photo=image, caption=caption, reply_markup=None, parse_mode='Markdown')
                             User.saveUtterance(chatId, message, byBot=True)
                         else:
                             formattedText = statement.format(item=temporaryAnswer, duplicateItem=duplicateItem)
                             message = bot.send_message(
                                 chat_id=chatId, 
                                 text=formattedText, 
-                                reply_markup=replyMarkup, 
+                                reply_markup=None, 
                                 parse_mode='Markdown')
                             User.saveUtterance(chatId, message, byBot=True)
                     else:
@@ -472,7 +468,7 @@ class GenericFlowHandler(object):
                         message = bot.send_message(
                             chat_id=chatId,
                             text=formattedText,
-                            reply_markup=replyMarkup,
+                            reply_markup=None,
                             parse_mode='Markdown')
                         User.saveUtterance(chatId, message, byBot=True)
 
@@ -482,9 +478,17 @@ class GenericFlowHandler(object):
                 message = bot.send_message(
                     chat_id=chatId,
                     text=formattedText,
-                    reply_markup=replyMarkup,
+                    reply_markup=None,
                     parse_mode='Markdown')
                 User.saveUtterance(chatId, message, byBot=True)
+
+            # send choice of text
+            message = bot.send_message(
+                    chat_id=chatId,
+                    text=choiceText,
+                    reply_markup=None,
+                    parse_mode='Markdown')
+            User.saveUtterance(chatId, message, byBot=True)
             return currentQuestionNumber
         else:
             return self.move_to_next_question(update, context)

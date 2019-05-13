@@ -264,18 +264,21 @@ class GenericFlowHandler(object):
             if update.message:
                 answer = update.message.text
                 if propertyName == 'building':
-                    temporaryAnswer['buildingName'] = answer 
+                    temporaryAnswer['buildingName'] = answer
+                    temporaryAnswer['buildingNameLower'] = answer.lower() 
             else:
                 callbackData = json.loads(update.callback_query.data)
                 if callbackData['value'] is None:
                     answer = None
                     if propertyName == 'building':
                         temporaryAnswer['buildingName'] = generalCopywriting.NOT_IN_A_BUILDING
+                        temporaryAnswer['buildingNameLower'] = generalCopywriting.NOT_IN_A_BUILDING.lower()
                 elif callbackData['value'] != callbackTypes.GENERAL_ANSWER_TYPE_NOT_SURE:
                     item = Item.getItemById(callbackData['value'], 'placeItems')
                     answer = item
                     if propertyName == 'building':
-                        temporaryAnswer['buildingName'] = item['name']     
+                        temporaryAnswer['buildingName'] = item['name']
+                        temporaryAnswer['buildingNameLower'] = item['name'].lower()      
 
         if 'multiItemPropertyName' in currentQuestion:
             # handle question with multiple input
@@ -295,7 +298,12 @@ class GenericFlowHandler(object):
                     temporaryAnswer[propertyName] = [answer]
         else:
             temporaryAnswer[propertyName] = answer
-        
+
+        if temporaryAnswer.get('isDuplicate', False) and 'duplicateItem' in temporaryAnswer:
+            temporaryAnswer = temporaryAnswer['duplicateItem'].toDict()
+            temporaryAnswer['isDuplicate'] = True
+            context.chat_data['temporaryAnswer'] = temporaryAnswer
+
         pprint(temporaryAnswer)
     
     def send_closing_statements(self, update, context):
@@ -336,12 +344,12 @@ class GenericFlowHandler(object):
             if isinstance(answer, dict) and '_ref' in answer:
                 answer = answer['_ref']
             queries.append((propertyName, '==', answer))
-        print(queries)  
         potentialDuplicates = FirestoreClient.getDocuments(collectionName=self.itemCollectionName, queries=queries)
 
         # select the last one from duplicate
         if potentialDuplicates:
             duplicateItem = potentialDuplicates[-1]
+            temporaryAnswer['duplicateItem'] = duplicateItem
             # send question
             if isinstance(currentQuestion['text'], list):
                 for idx,statement in enumerate(currentQuestion['text']):

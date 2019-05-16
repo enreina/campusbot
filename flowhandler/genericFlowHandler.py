@@ -65,7 +65,7 @@ class GenericFlowHandler(object):
                 question['answerDict'] = buildAnswerDict(buttonRows, withNotSureOption=True)
             elif question['type'] == questionType.QUESTION_TYPE_MULTIPLE_CHOICE_ITEM:
                 handler.append(MessageHandler(Filters.text, self._question_callback))
-            elif question['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS or question['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
+            elif question['type'] in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_CHECK_COURSE, questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION]:
                 regexRule = buildRegexFilter(question['buttonRows'])
                 question['answerDict'] = buildAnswerDict(question['buttonRows'])
                 handler.append(MessageHandler(Filters.regex(regexRule), self._question_callback))
@@ -140,7 +140,7 @@ class GenericFlowHandler(object):
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
             replyMarkup = {"remove_keyboard": True}
             choiceText = buildTextOfChoiceList(currentQuestion['buttonRows'], withNotSureOption=True)
-        elif currentQuestion['type'] in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION]::
+        elif currentQuestion['type'] in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION]:
             replyMarkup = {"remove_keyboard": True}
             # add choice to question text
             choiceText = buildTextOfChoiceList(currentQuestion['buttonRows'], withNotSureOption=False)
@@ -473,7 +473,6 @@ class GenericFlowHandler(object):
                         User.saveUtterance(chatId, message, byBot=True)
 
             else:
-                replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
                 formattedText = currentQuestion['text'].format(item=temporaryAnswer, duplicateItem=duplicateItem)
                 message = bot.send_message(
                     chat_id=chatId,
@@ -662,10 +661,12 @@ class GenericFlowHandler(object):
 
     # answers confirmation
     def _answers_confirmation_callback(self, update, context):
-        callbackData = json.loads(update.callback_query.data)
-        selectedAnswer = callbackData['value']
-        context.bot.answer_callback_query(update.callback_query.id)
-        chatId = update.callback_query.message.chat_id
+        currentQuestionNumber = context.chat_data['currentQuestionNumber']
+        currentQuestion = self.taskTemplate.questions[currentQuestionNumber]
+        cleanResponse = update.message.text.lower().encode('ascii', 'ignore').strip()
+        cleanResponse = re.sub(r'(^\W+)|(\W+$)', '',cleanResponse)
+        selectedAnswer = currentQuestion['answerDict'][cleanResponse]
+        chatId = update.message.chat_id
 
         # if submitting answers
         if selectedAnswer == callbackTypes.CONFIRM_SUBMIT:

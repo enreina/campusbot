@@ -32,6 +32,8 @@ class ValidateFlowHandler(GenericFlowHandler):
 
         data = {}
         for question in self.taskTemplate.questions:
+            if 'property' not in question:
+                continue
             propertyName = question['property']
             if propertyName in temporaryAnswer:
                 value = temporaryAnswer[propertyName]

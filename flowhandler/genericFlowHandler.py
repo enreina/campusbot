@@ -462,11 +462,13 @@ class GenericFlowHandler(object):
     # callbacks
     def _start_task_callback(self, update, context):
         bot = context.bot
-        context.chat_data['userId'] = update.message.from_user.id
-        context.chat_data['chatId'] = update.message.chat_id
         context.chat_data['currentQuestionNumber'] = 0
         context.chat_data['confirmationStatements'] = []
-        User.saveUtterance(update.message.from_user.id, update.message)
+        if update.message:
+            User.saveUtterance(update.message.from_user.id, update.message)
+            context.chat_data['userId'] = update.message.from_user.id
+            context.chat_data['chatId'] = update.message.chat_id
+        chatId = context.chat_data['chatId']
 
         for statement in self.taskTemplate.openingStatements:
             item = None
@@ -480,7 +482,7 @@ class GenericFlowHandler(object):
                     if 'imageCaption' in statement:
                         caption = statement['imageCaption'].format(item=item)
 
-                    message = bot.send_photo(chat_id=update.message.chat_id, photo=image, caption=caption, parse_mode='Markdown')
+                    message = bot.send_photo(chat_id=chatId, photo=image, caption=caption, parse_mode='Markdown')
                     User.saveUtterance(context.chat_data['userId'], message, byBot=True)
                 if 'jumpRules' in statement:
                     jumpRules = statement['jumpRules']
@@ -489,7 +491,7 @@ class GenericFlowHandler(object):
                     if shouldJump:
                         context.chat_data['currentQuestionNumber'] = jumpIndex
             else:
-                message = bot.send_message(chat_id=update.message.chat_id, text=statement.format(item=item), parse_mode='Markdown')
+                message = bot.send_message(chat_id=chatId, text=statement.format(item=item), parse_mode='Markdown')
                 User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
         self.send_current_question(update, context)
@@ -606,13 +608,14 @@ class GenericFlowHandler(object):
 
     # quit task
     def _quit_task_callback(self, update, context):
-        User.saveUtterance(context.chat_data['userId'], update.message)
+        if update.message:
+            User.saveUtterance(context.chat_data['userId'], update.message)
 
         if 'currentTaskInstance' in context.chat_data:
             del context.chat_data['currentTaskInstance']
         self.remove_from_dispatcher()
 
-        chatId = update.message.chat_id
+        chatId = context.chat_data['chatId']
 
         # offer to start other task
         message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.END_OF_TASK_TEXT, parse_mode='Markdown')
@@ -625,10 +628,18 @@ class GenericFlowHandler(object):
 
     # answers confirmation
     def _answers_confirmation_callback(self, update, context):
+        callbackData = json.loads(update.callback_query.data)
+        selectedAnswer = callbackData['value']
+        context.bot.answer_callback_query(update.callback_query.id)
+
         # if submitting answers
-
+        if selectedAnswer == callbackTypes.CONFIRM_SUBMIT:
+            return self.move_to_next_question(update, context)
         # if starting over
-
+        elif selectedAnswer == callbackTypes.CONFIRM_START_OVER:
+            return self._start_task_callback(update, context)
         # if quitting task
+        elif selectedAnswer == callbackTypes.CONFIRM_QUIT:
+            return self._quit_task_callback(update, context)
 
-        return
+        return self._fallbackCallback(update, context)

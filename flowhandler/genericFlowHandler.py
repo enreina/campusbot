@@ -315,16 +315,16 @@ class GenericFlowHandler(object):
             item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
             saveAsArray = 'saveAsArray' in currentQuestion and currentQuestion['saveAsArray']
             if not saveAsArray:
-                answer = {'propertyName': unicode(item), 'propertyValue': answer}
+                savedAnswer = {'propertyName': unicode(item), 'propertyValue': answer}
             else:
                 if answer is not None and answer:
-                    answer = item
+                    savedAnswer = item
             if propertyName in temporaryAnswer:
                 if saveAsArray and answer or not saveAsArray:
-                    temporaryAnswer[propertyName].append(answer)
+                    temporaryAnswer[propertyName].append(savedAnswer)
             else:
                 if saveAsArray and answer or not saveAsArray:
-                    temporaryAnswer[propertyName] = [answer]
+                    temporaryAnswer[propertyName] = [savedAnswer]
         else:
             temporaryAnswer[propertyName] = answer
 
@@ -336,7 +336,8 @@ class GenericFlowHandler(object):
         # build confirmation statement
         confirmationStatements = context.chat_data.get('confirmationStatements', [])
         if answer is not None and 'confirmationStatement' in currentQuestion:
-            statement = currentQuestion['confirmationStatement'] 
+            statement = currentQuestion['confirmationStatement']
+            statementToAppend = statement.copy() 
             if statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_TEXT:
                 # get confirmation based on response button
                 pprint(currentQuestion.get('buttonRows', []))
@@ -348,19 +349,23 @@ class GenericFlowHandler(object):
 
                     for button in buttons:
                         if button['value'] == answer and 'confirmation' in button:
-                            statement['text'] = button['confirmation']
-                
-                statement['text'] = statement['text'].format(item=temporaryAnswer)
+                            statementToAppend['text'] = button['confirmation']
+
+                if 'multiItemPropertyName' in currentQuestion:
+                    currentItem = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
+                    statementToAppend['text'] = statementToAppend['text'].format(currentItem=currentItem)
+                else:   
+                    statementToAppend['text'] = statementToAppend['text'].format(item=temporaryAnswer)
             elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_IMAGE:
                 if 'imageCaption' in statement:
-                    statement['imageCaption'] = statement['imageCaption'].format(item=temporaryAnswer)
-                statement['image'] = temporaryAnswer[statement['imagePropertyName']]
+                    statementToAppend['imageCaption'] = statementToAppend['imageCaption'].format(item=temporaryAnswer)
+                statementToAppend['image'] = temporaryAnswer[statementToAppend['imagePropertyName']]
             elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_LOCATION:
-                statement['location'] = temporaryAnswer[statement['locationPropertyName']]
-                if 'text' in statement:
-                    statement['text'] = statement['text'].format(item=temporaryAnswer)
+                statementToAppend['location'] = temporaryAnswer[statementToAppend['locationPropertyName']]
+                if 'text' in statementToAppend:
+                    statementToAppend['text'] = statementToAppend['text'].format(item=temporaryAnswer)
             
-            confirmationStatements.append(statement)
+            confirmationStatements.append(statementToAppend)
             context.chat_data['confirmationStatements'] = confirmationStatements
         
         print(confirmationStatements)

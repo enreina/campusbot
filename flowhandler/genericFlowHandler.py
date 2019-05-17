@@ -8,7 +8,7 @@ from telegram.ext import CommandHandler, MessageHandler, Filters, ConversationHa
 from dialoguemanager.response import generalCopywriting
 import db.firestoreClient as FirestoreClient
 from common.placeUtility import findNearestPlace
-from common.constants import taskType, questionType, specialStates, callbackTypes
+from common.constants import taskType, questionType, specialStates, callbackTypes, confirmationStatementTypes
 from pprint import pprint
 from common.inlineKeyboardHelper import buildInlineKeyboardMarkup
 from common import logicJumpHelper
@@ -131,7 +131,7 @@ class GenericFlowHandler(object):
             buttonRows.append([{'value': callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE, 'text': generalCopywriting.VALIDATE_ANSWER_NOT_SURE_TEXT}])
             currentQuestion['buttonRows'] = buttonRows
             replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
-        elif currentQuestion['type'] == questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS:
+        elif currentQuestion['type'] in [questionType.QUESTION_TYPE_WITH_CUSTOM_BUTTONS, questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION]:
             replyMarkup = buildInlineKeyboardMarkup(currentQuestion['buttonRows'])
         elif currentQuestion['type'] == questionType.QUESTION_TYPE_CHECK_COURSE:
             temporaryAnswer['doesCourseExist'] = False
@@ -165,6 +165,35 @@ class GenericFlowHandler(object):
             formattedQuestion = currentQuestion['text'].format(item=item, idx=currentItemIndex+1)
         else:
             formattedQuestion = currentQuestion['text'].format(item=temporaryAnswer)
+        
+        # send confirmation text
+        if currentQuestion['type'] == questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION:
+            confirmationStatements = context.chat_data.get('confirmationStatements', [])
+            if not confirmationStatements:
+                return self.move_to_next_question(update, context)
+
+            if 'openingText' in currentQuestion:
+                message = bot.send_message(chat_id=chatId, text=currentQuestion['openingText'], reply_markup=None, parse_mode='Markdown')
+                User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+            
+            confirmationTextOnly = ""
+            for statement in confirmationStatements:
+                if statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_TEXT:
+                    confirmationTextOnly = "{confirmationTextOnly}{text}\n".format(confirmationTextOnly=confirmationTextOnly, text=statement['text'])
+                elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_IMAGE:
+                    message = bot.send_photo(chat_id=chatId, photo=statement['image'], caption=statement.get('imageCaption', None), parse_mode='Markdown')
+                    User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+                elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_LOCATION:
+                    location = statement['location']
+                    if 'text' in statement:
+                        message = bot.send_message(chat_id=chatId, text=statement['text'], reply_markup=None, parse_mode='Markdown')
+                        User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+                    message = bot.send_location(chat_id=chatId, latitude=location['latitude'], longitude=location['longitude'])
+                    User.saveUtterance(context.chat_data['userId'], message, byBot=True)
+            
+            if confirmationTextOnly:
+                message = bot.send_message(chat_id=chatId, text=confirmationTextOnly, reply_markup=None, parse_mode='Markdown')
+                User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
         message = bot.send_message(chat_id=chatId, text=formattedQuestion, reply_markup=replyMarkup, parse_mode='Markdown')
         User.saveUtterance(context.chat_data['userId'], message, byBot=True)
@@ -286,16 +315,16 @@ class GenericFlowHandler(object):
             item = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
             saveAsArray = 'saveAsArray' in currentQuestion and currentQuestion['saveAsArray']
             if not saveAsArray:
-                answer = {'propertyName': unicode(item), 'propertyValue': answer}
+                savedAnswer = {'propertyName': unicode(item), 'propertyValue': answer}
             else:
                 if answer is not None and answer:
-                    answer = item
+                    savedAnswer = item
             if propertyName in temporaryAnswer:
                 if saveAsArray and answer or not saveAsArray:
-                    temporaryAnswer[propertyName].append(answer)
+                    temporaryAnswer[propertyName].append(savedAnswer)
             else:
                 if saveAsArray and answer or not saveAsArray:
-                    temporaryAnswer[propertyName] = [answer]
+                    temporaryAnswer[propertyName] = [savedAnswer]
         else:
             temporaryAnswer[propertyName] = answer
 
@@ -304,6 +333,44 @@ class GenericFlowHandler(object):
             temporaryAnswer['isDuplicate'] = True
             context.chat_data['temporaryAnswer'] = temporaryAnswer
 
+        # build confirmation statement
+        confirmationStatements = context.chat_data.get('confirmationStatements', [])
+        if answer is not None and 'confirmationStatement' in currentQuestion:
+            statement = currentQuestion['confirmationStatement']
+            statementToAppend = statement.copy() 
+            if statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_TEXT:
+                # get confirmation based on response button
+                pprint(currentQuestion.get('buttonRows', []))
+                for buttonRow in currentQuestion.get('buttonRows', []):
+                    if isinstance(buttonRow, dict):
+                        buttons = buttonRow.get('buttons', [])
+                    else:
+                        buttons = buttonRow
+
+                    for button in buttons:
+                        if button['value'] == answer and 'confirmation' in button:
+                            statementToAppend['text'] = button['confirmation']
+
+                if 'multiItemPropertyName' in currentQuestion:
+                    currentItem = temporaryAnswer[currentQuestion['multiItemPropertyName']][currentItemIndex]
+                    statementToAppend['text'] = statementToAppend['text'].format(currentItem=currentItem)
+                else:   
+                    statementToAppend['text'] = statementToAppend['text'].format(item=temporaryAnswer)
+            elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_IMAGE:
+                if 'imageCaption' in statement:
+                    statementToAppend['imageCaption'] = statementToAppend['imageCaption'].format(item=temporaryAnswer)
+                statementToAppend['image'] = temporaryAnswer[statementToAppend['imagePropertyName']]
+            elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_LOCATION:
+                statementToAppend['location'] = temporaryAnswer[statementToAppend['locationPropertyName']]
+                if 'text' in statementToAppend:
+                    statementToAppend['text'] = statementToAppend['text'].format(item=temporaryAnswer)
+            
+            confirmationStatements.append(statementToAppend)
+            context.chat_data['confirmationStatements'] = confirmationStatements
+        
+        print(confirmationStatements)
+
+        # debugging
         pprint(temporaryAnswer)
     
     def send_closing_statements(self, update, context):
@@ -400,10 +467,13 @@ class GenericFlowHandler(object):
     # callbacks
     def _start_task_callback(self, update, context):
         bot = context.bot
-        context.chat_data['userId'] = update.message.from_user.id
-        context.chat_data['chatId'] = update.message.chat_id
         context.chat_data['currentQuestionNumber'] = 0
-        User.saveUtterance(update.message.from_user.id, update.message)
+        context.chat_data['confirmationStatements'] = []
+        if update.message:
+            User.saveUtterance(update.message.from_user.id, update.message)
+            context.chat_data['userId'] = update.message.from_user.id
+            context.chat_data['chatId'] = update.message.chat_id
+        chatId = context.chat_data['chatId']
 
         for statement in self.taskTemplate.openingStatements:
             item = None
@@ -417,7 +487,7 @@ class GenericFlowHandler(object):
                     if 'imageCaption' in statement:
                         caption = statement['imageCaption'].format(item=item)
 
-                    message = bot.send_photo(chat_id=update.message.chat_id, photo=image, caption=caption, parse_mode='Markdown')
+                    message = bot.send_photo(chat_id=chatId, photo=image, caption=caption, parse_mode='Markdown')
                     User.saveUtterance(context.chat_data['userId'], message, byBot=True)
                 if 'jumpRules' in statement:
                     jumpRules = statement['jumpRules']
@@ -426,7 +496,7 @@ class GenericFlowHandler(object):
                     if shouldJump:
                         context.chat_data['currentQuestionNumber'] = jumpIndex
             else:
-                message = bot.send_message(chat_id=update.message.chat_id, text=statement.format(item=item), parse_mode='Markdown')
+                message = bot.send_message(chat_id=chatId, text=statement.format(item=item), parse_mode='Markdown')
                 User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
         self.send_current_question(update, context)
@@ -443,6 +513,10 @@ class GenericFlowHandler(object):
                 return self._fallbackCallback(update, context)
         
         User.saveUtterance(context.chat_data['userId'], message, callbackQuery=update.callback_query)
+        # special callback for confirmation
+        currentQuestion = self.taskTemplate.questions[context.chat_data['currentQuestionNumber']]
+        if currentQuestion['type'] == questionType.QUESTION_TYPE_ANSWERS_CONFIRMATION:
+            return self._answers_confirmation_callback(update, context)
         # save to temporary answer
         self.save_temporary_answer(update, context)
         # send response of current question
@@ -539,13 +613,14 @@ class GenericFlowHandler(object):
 
     # quit task
     def _quit_task_callback(self, update, context):
-        User.saveUtterance(context.chat_data['userId'], update.message)
+        if update.message:
+            User.saveUtterance(context.chat_data['userId'], update.message)
 
         if 'currentTaskInstance' in context.chat_data:
             del context.chat_data['currentTaskInstance']
         self.remove_from_dispatcher()
 
-        chatId = update.message.chat_id
+        chatId = context.chat_data['chatId']
 
         # offer to start other task
         message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.END_OF_TASK_TEXT, parse_mode='Markdown')
@@ -555,3 +630,22 @@ class GenericFlowHandler(object):
 
         return ConversationHandler.END
 
+
+    # answers confirmation
+    def _answers_confirmation_callback(self, update, context):
+        callbackData = json.loads(update.callback_query.data)
+        selectedAnswer = callbackData['value']
+        context.bot.answer_callback_query(update.callback_query.id)
+
+        # if submitting answers
+        if selectedAnswer == callbackTypes.CONFIRM_SUBMIT:
+            return self.move_to_next_question(update, context)
+        # if starting over
+        elif selectedAnswer == callbackTypes.CONFIRM_START_OVER:
+            context.chat_data['temporaryAnswer'] = {}
+            return self._start_task_callback(update, context)
+        # if quitting task
+        elif selectedAnswer == callbackTypes.CONFIRM_QUIT:
+            return self._quit_task_callback(update, context)
+
+        return self._fallbackCallback(update, context)

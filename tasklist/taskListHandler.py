@@ -26,8 +26,8 @@ class TaskListHandler:
         # create a command handler for entry
         self.entryCommandHandler = CommandHandler(entryCommand, self._entry_command_callback)
         # create a command handler to create new item
-        self.createFlowHandler = CreateFlowHandler(entryCommand, self.itemCollectionName, dispatcher, itemCollectionNamePrefix)
         self.cleanCanonicalName = self.canonicalName.lower().replace(" ", "")
+        self.createFlowHandler = CreateFlowHandler(self.cleanCanonicalName, self.itemCollectionName, dispatcher, itemCollectionNamePrefix)
 
     def add_to_dispatcher(self):
         self.dispatcher.add_handler(self.entryCommandHandler)

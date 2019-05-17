@@ -32,6 +32,8 @@ class EnrichFlowHandler(GenericFlowHandler):
 
         data = {}
         for question in self.taskTemplate.questions:
+            if 'property' not in question:
+                continue
             propertyName = question['property']
             if propertyName in temporaryAnswer:
                 value = temporaryAnswer[propertyName]
@@ -82,7 +84,7 @@ class EnrichFlowHandler(GenericFlowHandler):
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance
-        context.chat_data['temporaryAnswer'] = self.taskInstance['task']['item']
+        context.chat_data['temporaryAnswer'] = self.taskInstance['task']['item'].copy()
         context.chat_data['temporaryAnswer']['executionStartTime'] = datetime.now(tzlocal())
         questionNumber = super(EnrichFlowHandler, self)._start_task_callback(update, context)
 

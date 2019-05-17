@@ -50,7 +50,7 @@ class ValidateFlowHandler(GenericFlowHandler):
         # TO-DO: update task count of user
         # TO-DO: update taskInstance.completed and task count of user
         TaskInstance.update_task_instance(taskInstance, {'completed': True})
-        user['totalTasksCompleted'][self.itemCollectionNamePrefix] = user['totalTasksCompleted'][self.itemCollectionNamePrefix] + 1
+        user['totalTasksCompleted'][self.itemCollectionNamePrefix.lower()] = user['totalTasksCompleted'][self.itemCollectionNamePrefix.lower()] + 1
         tasksCompleted = user['tasksCompleted']
         tasksCompleted.append({'activeDate': data['createdAt']})
         User.updateUser(user['_id'], {
@@ -71,7 +71,7 @@ class ValidateFlowHandler(GenericFlowHandler):
 
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance
-        context.chat_data['temporaryAnswer'] = self.taskInstance['task']['aggregatedAnswers']
+        context.chat_data['temporaryAnswer'] = self.taskInstance['task']['aggregatedAnswers'].copy()
         context.chat_data['temporaryAnswer']['executionStartTime'] = datetime.now(tzlocal())
         questionNumber = super(ValidateFlowHandler, self)._start_task_callback(update, context)
 

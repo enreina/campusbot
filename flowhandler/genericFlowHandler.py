@@ -181,7 +181,7 @@ class GenericFlowHandler(object):
                 if statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_TEXT:
                     confirmationTextOnly = "{confirmationTextOnly}{text}\n".format(confirmationTextOnly=confirmationTextOnly, text=statement['text'])
                 elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_IMAGE:
-                    message = bot.send_photo(chat_id=chatId, photo=statement['image'], caption=statement['imageCaption'], parse_mode='Markdown')
+                    message = bot.send_photo(chat_id=chatId, photo=statement['image'], caption=statement.get('imageCaption', None), parse_mode='Markdown')
                     User.saveUtterance(context.chat_data['userId'], message, byBot=True)
                 elif statement['type'] == confirmationStatementTypes.CONFIRMATION_STATEMENT_TYPE_LOCATION:
                     location = statement['location']
@@ -642,6 +642,7 @@ class GenericFlowHandler(object):
             return self.move_to_next_question(update, context)
         # if starting over
         elif selectedAnswer == callbackTypes.CONFIRM_START_OVER:
+            context.chat_data['temporaryAnswer'] = {}
             return self._start_task_callback(update, context)
         # if quitting task
         elif selectedAnswer == callbackTypes.CONFIRM_QUIT:

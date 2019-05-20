@@ -2,6 +2,7 @@ import datetime
 import firestoreClient as FirestoreClient
 from google.cloud import firestore
 import common.campusbotApi as CampusBotApi
+from dateutil.tz import tzlocal
 
 class User(object):
 
@@ -50,7 +51,7 @@ class User(object):
     def saveUtterance(telegramId, message, byBot=False, callbackQuery=None):
         utteranceCollection = FirestoreClient.db.collection('users').document(str(telegramId)).collection('utterances')
         messageData = {
-            'createdAt': message.date,
+            'createdAt': message.date.replace(tzinfo=tzlocal()),
             'byBot': byBot
         }
         if message.text:

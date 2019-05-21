@@ -642,6 +642,7 @@ class GenericFlowHandler(object):
             return self.move_to_next_question(update, context)
         # if starting over
         elif selectedAnswer == callbackTypes.CONFIRM_START_OVER:
+            context.chat_data['executionStartTime'] = context.chat_data['temporaryAnswer'].get('executionStartTime', None)
             context.chat_data['temporaryAnswer'] = {}
             return self._start_task_callback(update, context)
         # if quitting task

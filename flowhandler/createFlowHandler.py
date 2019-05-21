@@ -92,7 +92,7 @@ class CreateFlowHandler(GenericFlowHandler):
         questionNumber = super(CreateFlowHandler, self)._start_task_callback(update, context)
         context.chat_data['currentTaskInstance'] = {}
         context.chat_data['temporaryAnswer'] = {
-            'executionStartTime': datetime.now(tzlocal())
+            'executionStartTime': context.chat_data.get('executionStartTime', datetime.now(tzlocal()))
         }
         
         return questionNumber

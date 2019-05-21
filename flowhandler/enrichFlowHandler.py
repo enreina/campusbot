@@ -54,6 +54,7 @@ class EnrichFlowHandler(GenericFlowHandler):
         data['taskInstanceId'] = taskInstance['_id']
         data['taskInstance'] = taskInstance['_ref']
         data['createdAt'] = datetime.now(tzlocal())
+        data['executionStartTime'] = temporaryAnswer.get('executionStartTime', None)
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
         # TO-DO: update taskInstance.completed and task count of user
@@ -85,7 +86,8 @@ class EnrichFlowHandler(GenericFlowHandler):
     def _start_task_callback(self, update, context):
         context.chat_data['currentTaskInstance'] = self.taskInstance
         context.chat_data['temporaryAnswer'] = self.taskInstance['task']['item'].copy()
-        context.chat_data['temporaryAnswer']['executionStartTime'] = datetime.now(tzlocal())
+        executionStartTime = context.chat_data.get('executionStartTime', datetime.now(tzlocal()))
+        context.chat_data['temporaryAnswer']['executionStartTime'] = executionStartTime
         questionNumber = super(EnrichFlowHandler, self)._start_task_callback(update, context)
 
         return questionNumber

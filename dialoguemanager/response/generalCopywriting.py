@@ -59,3 +59,5 @@ PUSH_NOTIF_RESPONSE_PATTERN = r"{yes}|{no}".format(yes=PUSH_NOTIF_RESPONSE_YES_C
 PUSH_NOTIF_RESPONSE_FOR_NO = "Okay! If you ever want to do the tasks, you can type /start"
 
 NOT_IN_A_BUILDING = "Not in a building"
+
+SUBMITTING_ANSWERS_TEXT = "Please wait as your answers are being submitted...⏳"

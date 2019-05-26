@@ -385,7 +385,12 @@ class GenericFlowHandler(object):
             formattedClosingStatement = statement.format(item=temporaryAnswer)
 
             replyMarkup = {"remove_keyboard": True}
-            message = context.bot.send_message(chat_id=chatId, text=formattedClosingStatement, reply_markup=replyMarkup, parse_mode='Markdown')
+            message = context.bot.send_message(
+                chat_id=chatId, 
+                text=formattedClosingStatement, 
+                reply_markup=replyMarkup, 
+                parse_mode='Markdown',
+                disable_web_page_preview=True)
             User.saveUtterance(context.chat_data['userId'], message, byBot=True)
 
         # offer to start other task

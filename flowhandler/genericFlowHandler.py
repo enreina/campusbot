@@ -647,6 +647,7 @@ class GenericFlowHandler(object):
         # if submitting answers
         if selectedAnswer == callbackTypes.CONFIRM_SUBMIT:
             message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.SUBMITTING_ANSWERS_TEXT, parse_mode='Markdown')
+            User.saveUtterance(context.chat_data['userId'], message, byBot=True)
             context.bot.send_chat_action(chatId, ChatAction.TYPING)
             return self.move_to_next_question(update, context)
         # if starting over

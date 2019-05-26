@@ -15,6 +15,7 @@ from common import logicJumpHelper
 import re
 import settings as env
 import json
+from telegram import ChatAction
 
 class GenericFlowHandler(object):
     '''Abstraction of a task flow handler
@@ -641,9 +642,12 @@ class GenericFlowHandler(object):
         callbackData = json.loads(update.callback_query.data)
         selectedAnswer = callbackData['value']
         context.bot.answer_callback_query(update.callback_query.id)
+        chatId = update.callback_query.message.chat_id
 
         # if submitting answers
         if selectedAnswer == callbackTypes.CONFIRM_SUBMIT:
+            message = context.bot.send_message(chat_id=chatId, text=generalCopywriting.SUBMITTING_ANSWERS_TEXT, parse_mode='Markdown')
+            context.bot.send_chat_action(chatId, ChatAction.TYPING)
             return self.move_to_next_question(update, context)
         # if starting over
         elif selectedAnswer == callbackTypes.CONFIRM_START_OVER:

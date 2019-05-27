@@ -45,16 +45,27 @@ class TaskInstance(object):
         else:
             userId = str(user) 
         # get task instances
-        task_instances = FirestoreClient.getDocumentsFromSubcollection('users', userId, taskInstanceCollectionName, queries=[('completed','==', False), ('expired', '==', False)], orderBy='createdAt', orderDirection=firestore.Query.ASCENDING, withRef=True)
+        task_instances = FirestoreClient.getDocumentsFromSubcollection('users', userId, taskInstanceCollectionName, queries=[('completed','==', False), ('expired', '==', False)], orderBy='createdAt', orderDirection=firestore.Query.DESCENDING, withRef=True)
+        new_task_instance_list = []
         # populate task inside each task instance
         for task_instance in task_instances:
-            task_instance['task'] = task_instance['task'].get().to_dict()
-            task_instance['task']['item'] = task_instance['task']['item'].get().to_dict()
+            task = task_instance['task'].get()
+            if not task.exists:
+                continue
+            
+            task_instance['task'] = task.to_dict()
+            item = task_instance['task']['item'].get()
+
+            if not item.exists:
+                continue
+            task_instance['task']['item'] = item.to_dict()
 
             task_instance['taskTypeAsString'] = TASK_TYPE_AS_STRING[task_instance['task']['type']]
             task_instance['task_preview'] = TaskInstance.build_task_preview(task_instance, taskInstanceCollectionName)
 
-        return [Bunch(task_instance) for task_instance in task_instances]
+            new_task_instance_list.append(task_instance)
+
+        return [Bunch(task_instance) for task_instance in new_task_instance_list]
 
     @staticmethod
     def build_task_preview(task_instance, taskInstanceCollectionName):

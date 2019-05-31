@@ -42,13 +42,49 @@ for user in allUsers:
         # if (numTasksCompleted > 1):
         #     activeUsers = activeUsers + 1
 
-    
+print("Mobile App")
+print("#Users: {count}".format(
+    count=len(mobileAppUsers)
+))    
+print("#Users who completed at least 1 task: {count}".format(
+    count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 1])
+))   
+print("#Users who completed at least 2 task: {count}".format(
+    count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 2])
+)) 
+print("#Users who completed at least 3 task: {count}".format(
+    count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 3])
+))     
 
-print([x['telegramId'] for x in chatbotv1Users])
-print(len(chatbotv1Users))
-print([x['telegramId'] for x in chatbotv2Users])
-print(len(chatbotv2Users))
-print(len(mobileAppUsers))
-print(activeUsers)
+print("Chatbot 1")
+print("#Users of Chatbot 1: {count}".format(
+    count=len(chatbotv1Users)
+))
+print("#Users who completed at least 1 task: {count}".format(
+    count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 1])
+))  
+print("#Users who completed at least 2 task: {count}".format(
+    count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 2])
+)) 
+print("#Users who completed at least 3 task: {count}".format(
+    count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 3])
+))   
+
+print("Chatbot 2")
+print("#Users of Chatbot 2: {count}".format(
+    count=len(chatbotv2Users)
+))
+print("#Users who completed at least 1 task: {count}".format(
+    count=len([x for x in chatbotv2Users
+     if len(x.get('tasksCompleted',[])) >= 1])
+))  
+print("#Users who completed at least 2 task: {count}".format(
+    count=len([x for x in chatbotv2Users
+     if len(x.get('tasksCompleted',[])) >= 2])
+)) 
+print("#Users who completed at least 3 task: {count}".format(
+    count=len([x for x in chatbotv2Users
+     if len(x.get('tasksCompleted',[])) >= 3])
+))  
 
 

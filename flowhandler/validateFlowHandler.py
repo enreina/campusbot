@@ -48,6 +48,8 @@ class ValidateFlowHandler(GenericFlowHandler):
         data['executionStartTime'] = temporaryAnswer.get('executionStartTime', None)
 
         FirestoreClient.saveDocument(self.itemCollectionName, data=data)
+        if 'executionStartTime' in context.chat_data:
+            del context.chat_data['executionStartTime']
         # TO-DO: update task count of user
         # TO-DO: update taskInstance.completed and task count of user
         TaskInstance.update_task_instance(taskInstance, {'completed': True})

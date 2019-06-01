@@ -37,7 +37,10 @@ def findNearestPlace(latitude, longitude, itemCategory=buildingCategory, limit=3
     places = FirestoreClient.getDocuments('placeItems', [('category', '==', itemCategory)])
 
     distances = []
+    existingPlaceNames = {}
     for place in places:
+        if place["name"] in existingPlaceNames:
+            continue
         placeLatitude = place['geolocation']['latitude']
         placeLongitude = place['geolocation']['longitude']
         distances.append(
@@ -47,6 +50,7 @@ def findNearestPlace(latitude, longitude, itemCategory=buildingCategory, limit=3
                 "distance": geodesic((placeLatitude,placeLongitude), (latitude, longitude)).meters
             }
         )
+        existingPlaceNames[place["name"]] = True
 
     sortedDistances = sorted(distances, key = lambda i: i['distance'])
 

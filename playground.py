@@ -33,110 +33,123 @@ for user in allUsers:
         # if (numTasksCompleted > 1):
         #     activeUsers = activeUsers + 1
 
-print("Mobile App")
-print("#Users: {count}".format(
-    count=len(mobileAppUsers)
-))    
-print("#Users who completed at least 1 task: {count}".format(
-    count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 1])
-))   
-print("#Users who completed at least 2 task: {count}".format(
-    count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 2])
-)) 
-print("#Users who completed at least 3 task: {count}".format(
-    count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 3])
-))     
+def count_user_conversion():
+    print("Mobile App")
+    print("#Users: {count}".format(
+        count=len(mobileAppUsers)
+    ))    
+    print("#Users who completed at least 1 task: {count}".format(
+        count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 1])
+    ))   
+    print("#Users who completed at least 2 task: {count}".format(
+        count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 2])
+    )) 
+    print("#Users who completed at least 3 task: {count}".format(
+        count=len([x for x in mobileAppUsers if len(x.get('tasksCompleted',[])) >= 3])
+    ))     
 
-print("Chatbot 1")
-print("#Users of Chatbot 1: {count}".format(
-    count=len(chatbotv1Users)
-))
-print("#Users who completed at least 1 task: {count}".format(
-    count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 1])
-))  
-print("#Users who completed at least 2 task: {count}".format(
-    count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 2])
-)) 
-print("#Users who completed at least 3 task: {count}".format(
-    count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 3])
-))   
-
-print("Chatbot 2")
-print("#Users of Chatbot 2: {count}".format(
-    count=len(chatbotv2Users)
-))
-print("#Users who completed at least 1 task: {count}".format(
-    count=len([x for x in chatbotv2Users if len(x.get('tasksCompleted',[])) >= 1])
-))  
-print("#Users who completed at least 2 task: {count}".format(
-    count=len([x for x in chatbotv2Users if len(x.get('tasksCompleted',[])) >= 2])
-)) 
-print("#Users who completed at least 3 task: {count}".format(
-    count=len([x for x in chatbotv2Users if len(x.get('tasksCompleted',[])) >= 3])
-))  
-
-# executed time
-print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\texecutionTime")
-rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t{executionTime}"
-# only consider from this date
-startTime = datetime.datetime(2019,5,16,tzinfo=tzlocal())
-# place items
-
-getPlaceItems = db.collection('placeItems').get()
-allPlaceItems = [(x.id, x.to_dict()) for x in getPlaceItems]
-chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
-chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
-
-for placeItemId, placeItem in allPlaceItems:
-    authorId = placeItem.get('authorId', None)
-    executionTime = (placeItem['createdAt'] - placeItem['executionStartTime']).total_seconds()
-    if authorId in chatbot1TelegramIds and 'executionStartTime' in placeItem:
-        chatbotVersion = "Chatbot 1"
-    elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeItem:
-        chatbotVersion = "Chatbot 2"
-    else:
-        continue
-
-    print(rowTemplate.format(
-        chatbotVersion=chatbotVersion,
-        itemId=placeItemId,
-        taskType="create",
-        userId=authorId,
-        createdAt=placeItem['createdAt'],
-        executionTime=executionTime
+    print("Chatbot 1")
+    print("#Users of Chatbot 1: {count}".format(
+        count=len(chatbotv1Users)
     ))
+    print("#Users who completed at least 1 task: {count}".format(
+        count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 1])
+    ))  
+    print("#Users who completed at least 2 task: {count}".format(
+        count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 2])
+    )) 
+    print("#Users who completed at least 3 task: {count}".format(
+        count=len([x for x in chatbotv1Users if len(x.get('tasksCompleted',[])) >= 3])
+    ))   
 
-# place enrichments
-getPlaceEnrichments = db.collection('placeEnrichments').get()
-allPlaceEnrichments = [x.to_dict() for x in getPlaceEnrichments]
-chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
-chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
-
-for placeEnrichment in allPlaceEnrichments:
-    authorId = placeEnrichment['taskInstance'].parent.parent.id
-    if 'executionStartTime' not in placeEnrichment:
-        continue
-    executionTime = (placeEnrichment['createdAt'] - placeEnrichment['executionStartTime']).total_seconds()
-    try:
-        placeItemId = placeEnrichment['taskInstance'].get().get('task').get().get('itemId')
-    except:
-        continue
-    if authorId in chatbot1TelegramIds and 'executionStartTime' in placeEnrichment:
-        chatbotVersion = "Chatbot 1"
-    elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeEnrichment:
-        chatbotVersion = "Chatbot 2"
-    else:
-        continue
-
-    print(rowTemplate.format(
-        chatbotVersion=chatbotVersion,
-        itemId=placeItemId,
-        taskType="enrich",
-        userId=authorId,
-        createdAt=placeEnrichment['createdAt'],
-        executionTime=executionTime
+    print("Chatbot 2")
+    print("#Users of Chatbot 2: {count}".format(
+        count=len(chatbotv2Users)
     ))
+    print("#Users who completed at least 1 task: {count}".format(
+        count=len([x for x in chatbotv2Users if len(x.get('tasksCompleted',[])) >= 1])
+    ))  
+    print("#Users who completed at least 2 task: {count}".format(
+        count=len([x for x in chatbotv2Users if len(x.get('tasksCompleted',[])) >= 2])
+    )) 
+    print("#Users who completed at least 3 task: {count}".format(
+        count=len([x for x in chatbotv2Users if len(x.get('tasksCompleted',[])) >= 3])
+    ))  
 
-# place validations
+def summary_execution_time():
+    # executed time
+    print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\texecutionTime")
+    rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t{executionTime}"
+    # only consider from this date
+    startTime = datetime.datetime(2019,5,16,tzinfo=tzlocal())
+    # place items
+
+    getPlaceItems = db.collection('placeItems').get()
+    allPlaceItems = [(x.id, x.to_dict()) for x in getPlaceItems]
+    chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
+    chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
+
+    for placeItemId, placeItem in allPlaceItems:
+        authorId = placeItem.get('authorId', None)
+        executionTime = (placeItem['createdAt'] - placeItem['executionStartTime']).total_seconds()
+        if authorId in chatbot1TelegramIds and 'executionStartTime' in placeItem:
+            chatbotVersion = "Chatbot 1"
+        elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeItem:
+            chatbotVersion = "Chatbot 2"
+        else:
+            continue
+
+        print(rowTemplate.format(
+            chatbotVersion=chatbotVersion,
+            itemId=placeItemId,
+            taskType="create",
+            userId=authorId,
+            createdAt=placeItem['createdAt'],
+            executionTime=executionTime
+        ))
+
+    # place enrichments
+    getPlaceEnrichments = db.collection('placeEnrichments').get()
+    allPlaceEnrichments = [x.to_dict() for x in getPlaceEnrichments]
+    chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
+    chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
+
+    for placeEnrichment in allPlaceEnrichments:
+        authorId = placeEnrichment['taskInstance'].parent.parent.id
+        if 'executionStartTime' not in placeEnrichment:
+            continue
+        executionTime = (placeEnrichment['createdAt'] - placeEnrichment['executionStartTime']).total_seconds()
+        try:
+            placeItemId = placeEnrichment['taskInstance'].get().get('task').get().get('itemId')
+        except:
+            continue
+        if authorId in chatbot1TelegramIds and 'executionStartTime' in placeEnrichment:
+            chatbotVersion = "Chatbot 1"
+        elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeEnrichment:
+            chatbotVersion = "Chatbot 2"
+        else:
+            continue
+
+        print(rowTemplate.format(
+            chatbotVersion=chatbotVersion,
+            itemId=placeItemId,
+            taskType="enrich",
+            userId=authorId,
+            createdAt=placeEnrichment['createdAt'],
+            executionTime=executionTime
+        ))
+
+def count_task_completed():
+    print("userId\tfoodCount\tplaceCount\tcourseCount\ttrashBinCount")
+    for user in chatbotv1Users + chatbotv2Users:
+        print("{telegramId}\t{foodCount}\t{placeCount}\t{courseCount}\t{trashBinCount}".format(
+            telegramId=user['telegramId'],
+            foodCount=user.get('totalTasksCompleted', {}).get('food', 0),
+            placeCount=user.get('totalTasksCompleted', {}).get('place', 0),
+            courseCount=user.get('totalTasksCompleted', {}).get('question', 0),
+            trashBinCount=user.get('totalTasksCompleted', {}).get('trashbin', 0)
+        ))
+
+count_task_completed()
 
 

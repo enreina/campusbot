@@ -61,3 +61,6 @@ PUSH_NOTIF_RESPONSE_FOR_NO = "Okay! If you ever want to do the tasks, you can ty
 NOT_IN_A_BUILDING = "Not in a building"
 
 SUBMITTING_ANSWERS_TEXT = "Please wait as your answers are being submitted...⏳"
+
+MAINTENANCE_MODE_TEXT = '''CampusBot is currently under maintenance 🛠
+Will let you know as soon as it's back up!'''

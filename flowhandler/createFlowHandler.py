@@ -64,6 +64,10 @@ class CreateFlowHandler(GenericFlowHandler):
                 data['course'] = Course.find_or_create_course_ref(data['courseCode'], data['courseName'])
 
         newItem = FirestoreClient.saveDocument(self.itemCollectionName, data=data)
+        
+        if 'executionStartTime' in context.chat_data:
+            del context.chat_data['executionStartTime']
+            
         # update tasks completed
         user['totalTasksCompleted'][self.itemCollectionNamePrefix.lower()] = user['totalTasksCompleted'][self.itemCollectionNamePrefix.lower()] + 1
         tasksCompleted = user['tasksCompleted']

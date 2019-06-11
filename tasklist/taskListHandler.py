@@ -11,6 +11,7 @@ from flowhandler.validateFlowHandler import ValidateFlowHandler
 from pprint import pprint
 from common.constants import taskType
 from persistence.handlersPerUser import handlersPerUser
+import settings as env
 
 class TaskListHandler:
 
@@ -51,7 +52,8 @@ class TaskListHandler:
             task = taskInstance.task
             item = task['item']
             command = "{entryCommand}{idx}".format(entryCommand=self.cleanCanonicalName, idx=idx+1+offset)
-            preview_url = "http://campusbot.cf/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
+            preview_url = "{baseUrl}/task-preview?title={taskPreview[title]}&imageurl={taskPreview[imageurl]}&itemtype={taskPreview[itemtype]}&description={taskPreview[description]}".format(
+                baseUrl=env.BASE_URL,
                 taskPreview=taskPreview,
                 canonicalName=self.canonicalName
             )

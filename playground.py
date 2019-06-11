@@ -150,6 +150,67 @@ def count_task_completed():
             trashBinCount=user.get('totalTasksCompleted', {}).get('trashbin', 0)
         ))
 
-count_task_completed()
+def count_task_completed_by_type():
+    for user in chatbotv1Users + chatbotv2Users:
+        totalCountEnrich = 0
+        totalCountValidate = 0
+        totalCountCreate = 0
+        for domain in ['food', 'place', 'question', 'trashBin']:
+            totalTasksCompleted = user.get('totalTasksCompleted', {}).get(domain.lower(), 0)
+            countEnrich = 0
+            countValidate = 0
+            # get task instances
+            taskInstances = db.collection('users').document(user['telegramId']).collection(domain + 'TaskInstances').where(u'completed', u'==', True).get()
+            
+            for taskInstance in taskInstances:
+                if taskInstance.to_dict()['task'].get().to_dict()['type'] == 0:
+                    countEnrich = countEnrich + 1
+                else:
+                    countValidate = countValidate + 1
+
+            countCreate = totalTasksCompleted - (countEnrich + countValidate)
+            user['taskCompleted'] = {
+                domain: {
+                    'create': countCreate,
+                    'enrich': countEnrich,
+                    'validate': countValidate
+                }
+            }
+
+            totalCountCreate = totalCountCreate + countCreate
+            totalCountEnrich = totalCountEnrich + countEnrich
+            totalCountValidate = totalCountValidate + countValidate
+
+        
+        print("{telegramId}\t{createCount}\t{enrichCount}\t{validateCount}".format(
+            telegramId=user['telegramId'],
+            createCount=totalCountCreate,
+            enrichCount=totalCountEnrich,
+            validateCount=totalCountValidate
+        ))
+
+def print_enrichment_detail():
+    placeEnrichments = db.collection('placeEnrichments').get()
+
+    print('placeEnrichmentId\titemId\tuserId\ttaskInstanceId')
+    for placeEnrichment in placeEnrichments:
+        placeEnrichmentId = placeEnrichment.id
+        placeEnrichmentData = placeEnrichment.to_dict()
+        userId = placeEnrichmentData['taskInstance'].parent.parent.id
+        taskInstanceId = placeEnrichmentData['taskInstanceId']
+        try:
+            itemId = placeEnrichmentData['taskInstance'].get().to_dict()['task'].get().to_dict()['itemId']
+
+            print("{placeEnrichmentId}\t{itemId}\t{userId}\t{taskInstanceId}".format(
+                placeEnrichmentId=placeEnrichmentId,
+                itemId=itemId,
+                userId=userId,
+                taskInstanceId=taskInstanceId    
+            ))
+        except:
+            continue
+        
+
+print_enrichment_detail()
 
 

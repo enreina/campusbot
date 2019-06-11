@@ -5,6 +5,7 @@ from common.constants.taskType import TASK_TYPE_AS_STRING
 from firebase_admin import firestore
 from pprint import pprint
 import urllib
+import settings as env
 
 TASK_PREVIEW_RULES = {
     'placeTaskInstances': {
@@ -30,7 +31,7 @@ TASK_PREVIEW_RULES = {
     },
     'questionTaskInstances': {
         'caption': '',
-        'imageurl': 'http://campusbot.cf/images/blank-white-image.png',
+        'imageurl': '{imageUrlPrefix}/blank-white-image.png'.format(imageUrlPrefix=env.IMAGE_URL_PREFIX),
         'title': '{task_instance[task][item][question]}',
         'description': '{task_instance[taskTypeAsString]}',
         'itemtype': '{task_instance[task][item][courseName]}'

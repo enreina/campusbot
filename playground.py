@@ -76,7 +76,7 @@ def count_user_conversion():
         count=len([x for x in chatbotv2Users if len(x.get('tasksCompleted',[])) >= 3])
     ))  
 
-def summary_execution_time():
+def summary_execution_time(domain="place"):
     # executed time
     print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\texecutionTime")
     rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t{executionTime}"
@@ -84,13 +84,15 @@ def summary_execution_time():
     startTime = datetime.datetime(2019,5,16,tzinfo=tzlocal())
     # place items
 
-    getPlaceItems = db.collection('placeItems').get()
+    getPlaceItems = db.collection(domain + 'Items').get()
     allPlaceItems = [(x.id, x.to_dict()) for x in getPlaceItems]
     chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
     chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
 
     for placeItemId, placeItem in allPlaceItems:
         authorId = placeItem.get('authorId', None)
+        if 'executionStartTime' not in placeItem:
+            continue
         executionTime = (placeItem['createdAt'] - placeItem['executionStartTime']).total_seconds()
         if authorId in chatbot1TelegramIds and 'executionStartTime' in placeItem:
             chatbotVersion = "Chatbot 1"
@@ -109,35 +111,72 @@ def summary_execution_time():
         ))
 
     # place enrichments
-    getPlaceEnrichments = db.collection('placeEnrichments').get()
+    getPlaceEnrichments = db.collection(domain + 'Enrichments').get()
     allPlaceEnrichments = [x.to_dict() for x in getPlaceEnrichments]
     chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
     chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
 
     for placeEnrichment in allPlaceEnrichments:
-        authorId = placeEnrichment['taskInstance'].parent.parent.id
-        if 'executionStartTime' not in placeEnrichment:
-            continue
-        executionTime = (placeEnrichment['createdAt'] - placeEnrichment['executionStartTime']).total_seconds()
-        try:
-            placeItemId = placeEnrichment['taskInstance'].get().get('task').get().get('itemId')
+        try: 
+            authorId = placeEnrichment['taskInstance'].parent.parent.id
+            if 'executionStartTime' not in placeEnrichment:
+                continue
+            executionTime = (placeEnrichment['createdAt'] - placeEnrichment['executionStartTime']).total_seconds()
+            try:
+                placeItemId = placeEnrichment['taskInstance'].get().get('task').get().get('itemId')
+            except:
+                continue
+            if authorId in chatbot1TelegramIds and 'executionStartTime' in placeEnrichment:
+                chatbotVersion = "Chatbot 1"
+            elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeEnrichment:
+                chatbotVersion = "Chatbot 2"
+            else:
+                continue
+
+            print(rowTemplate.format(
+                chatbotVersion=chatbotVersion,
+                itemId=placeItemId,
+                taskType="enrich",
+                userId=authorId,
+                createdAt=placeEnrichment['createdAt'],
+                executionTime=executionTime
+            ))
         except:
             continue
-        if authorId in chatbot1TelegramIds and 'executionStartTime' in placeEnrichment:
-            chatbotVersion = "Chatbot 1"
-        elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeEnrichment:
-            chatbotVersion = "Chatbot 2"
-        else:
-            continue
 
-        print(rowTemplate.format(
-            chatbotVersion=chatbotVersion,
-            itemId=placeItemId,
-            taskType="enrich",
-            userId=authorId,
-            createdAt=placeEnrichment['createdAt'],
-            executionTime=executionTime
-        ))
+    # place validations
+    getPlaceValidations = db.collection(domain + 'Validations').get()
+    allPlaceValidations = [x.to_dict() for x in getPlaceValidations]
+    chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
+    chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
+
+    for placeValidation in allPlaceValidations:
+        try:
+            authorId = placeValidation['taskInstance'].parent.parent.id
+            if 'executionStartTime' not in placeValidation:
+                continue
+            executionTime = (placeValidation['createdAt'] - placeValidation['executionStartTime']).total_seconds()
+            try:
+                placeItemId = placeValidation['taskInstance'].get().get('task').get().get('itemId')
+            except:
+                continue
+            if authorId in chatbot1TelegramIds and 'executionStartTime' in placeValidation:
+                chatbotVersion = "Chatbot 1"
+            elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeValidation:
+                chatbotVersion = "Chatbot 2"
+            else:
+                continue
+
+            print(rowTemplate.format(
+                chatbotVersion=chatbotVersion,
+                itemId=placeItemId,
+                taskType="validate",
+                userId=authorId,
+                createdAt=placeValidation['createdAt'],
+                executionTime=executionTime
+            ))
+        except:
+            continue
 
 def count_task_completed():
     print("userId\tfoodCount\tplaceCount\tcourseCount\ttrashBinCount")
@@ -152,6 +191,11 @@ def count_task_completed():
 
 def count_task_completed_by_type():
     for user in chatbotv1Users + chatbotv2Users:
+        skipUtterances = db.collection('users').document(user['telegramId']).collection('utterances').where(u'text', u'==', u'/skip').get()
+        skipCount = len([utter for utter in skipUtterances])
+        userUtterances = db.collection('users').document(user['telegramId']).collection('utterances').where(u'byBot', u'==', False).get()
+        utterCount = len([utter for utter in userUtterances])
+
         totalCountEnrich = 0
         totalCountValidate = 0
         totalCountCreate = 0
@@ -182,11 +226,15 @@ def count_task_completed_by_type():
             totalCountValidate = totalCountValidate + countValidate
 
         
-        print("{telegramId}\t{createCount}\t{enrichCount}\t{validateCount}".format(
+        print("{telegramId}\t{registeredAt}\t{createCount}\t{enrichCount}\t{validateCount}\t{totalTaskCount}\t{skipCount}\t{utterCount}".format(
             telegramId=user['telegramId'],
+            registeredAt=user['createdAt'].strftime("%Y-%m-%d %H:%M:%S"),
             createCount=totalCountCreate,
             enrichCount=totalCountEnrich,
-            validateCount=totalCountValidate
+            validateCount=totalCountValidate,
+            totalTaskCount=totalCountCreate+totalCountEnrich+totalCountValidate,
+            skipCount=skipCount,
+            utterCount=utterCount
         ))
 
 def print_enrichment_detail():
@@ -210,7 +258,30 @@ def print_enrichment_detail():
         except:
             continue
         
+def fix_image_url():
+    for domain in ['place', 'trashBin', 'question', 'food']:
+        items = db.collection(domain + 'Items').get()
 
-print_enrichment_detail()
+        for item in items:
+            itemDict = item.to_dict()
+            if 'imageUrl' in itemDict and itemDict['imageUrl'] is not None:
+                imageUrl = itemDict['imageUrl']
+                print(imageUrl)
+                imageUrl = imageUrl.replace('http://campusbot.cf', 'https://hcbot.cf')
+                imageUrl = imageUrl.replace('https://campusbot.cf', 'https://hcbot.cf')
+                print(imageUrl)
+                db.collection(domain + 'Items').document(item.id).update({'imageUrl': imageUrl})
+
+def count_skip():
+    for user in chatbotv1Users + chatbotv2Users:
+        skipUtterances = db.collection('users').document(user['telegramId']).collection('utterances').where(u'text', u'==', u'/skip').get()
+        skipCount = len([utter for utter in skipUtterances])
+
+        print("{telegramId}\t{skipCount}".format(
+            telegramId=user['telegramId'],
+            skipCount=skipCount
+        ))
+
+count_task_completed_by_type()
 
 

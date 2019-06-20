@@ -1,5 +1,11 @@
 # campusbot
 
+![Overall System Design](overall-system-design.png)
+
+The CampusBot API repository: [https://github.com/enreina/campusbot-api](https://github.com/enreina/campusbot-api)
+
+We use Google Firestore for our database. Exhaustive schema descriptions for each collection can be seen here: [CampusBot Database Structure](https://docs.google.com/document/d/13jITw5RtkcE60GvN-HtvoUBkVkW_MdHu_eqWAu7p5w4/edit?usp=sharing).
+
 ## Setting up telegram bot
 
 ## How to Run (for development environment)

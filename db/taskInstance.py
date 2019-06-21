@@ -66,6 +66,7 @@ class TaskInstance(object):
 
             new_task_instance_list.append(task_instance)
 
+        new_task_instance_list = sorted(new_task_instance_list, key = lambda i: i['task']['type'], reverse=True)
         return [Bunch(task_instance) for task_instance in new_task_instance_list]
 
     @staticmethod

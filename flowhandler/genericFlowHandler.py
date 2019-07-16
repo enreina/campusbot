@@ -237,9 +237,9 @@ class GenericFlowHandler(object):
             return
         
         if currentQuestion['type'] == questionType.QUESTION_TYPE_CATEGORIZATION:
-            if temporaryAnswer[currentQuestion['property']] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE:
+            if temporaryAnswer[currentQuestion['property']] == callbackTypes.CATEGORIZATION_ANSWER_TYPE_NOT_SURE or temporaryAnswer[currentQuestion['property']] is None:
                 formattedResponseOk = currentQuestion['responseNotSure']
-            else:
+            elif 'responseOk' in currentQuestion:
                 formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)
         else: 
             formattedResponseOk = currentQuestion['responseOk'].format(item=temporaryAnswer)

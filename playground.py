@@ -282,6 +282,130 @@ def count_skip():
             skipCount=skipCount
         ))
 
-count_task_completed_by_type()
+def print_answers_create(domain="place"):
+    propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+    # header
+    print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\t{propertyKeys}".format(propertyKeys="\t".join(propertyKeys)))
+    rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t" + ("\t".join(["{answer["+propKey+"]}" for propKey in propertyKeys]))
+    # place items
+
+    getPlaceItems = db.collection(domain + 'Items').get()
+    allPlaceItems = [(x.id, x.to_dict()) for x in getPlaceItems]
+    chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
+    chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
+
+    for placeItemId, placeItem in allPlaceItems:
+        authorId = placeItem.get('authorId', None)
+        if 'executionStartTime' not in placeItem:
+            continue
+        executionTime = (placeItem['createdAt'] - placeItem['executionStartTime']).total_seconds()
+        if authorId in chatbot1TelegramIds and 'executionStartTime' in placeItem:
+            chatbotVersion = "Chatbot 1"
+        elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeItem:
+            chatbotVersion = "Chatbot 2"
+        else:
+            continue
+
+        answer = {}
+        for key in propertyKeys:
+            answer[key] = placeItem.get(key, None)
+
+        print(rowTemplate.format(
+            chatbotVersion=chatbotVersion,
+            itemId=placeItemId,
+            taskType="create",
+            userId=authorId,
+            createdAt=placeItem['createdAt'],
+            answer=answer
+        ))
+
+def print_answers_enrich(domain="place"):
+    propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+    # header
+    print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\t{propertyKeys}".format(propertyKeys="\t".join(propertyKeys)))
+    rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t" + ("\t".join(["{answer["+propKey+"]}" for propKey in propertyKeys]))
+    # place enrichments
+    getPlaceEnrichments = db.collection(domain + 'Enrichments').get()
+    allPlaceEnrichments = [x.to_dict() for x in getPlaceEnrichments]
+    chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
+    chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
+
+    for placeEnrichment in allPlaceEnrichments:
+        answer = {}
+        authorId = placeEnrichment['taskInstance'].parent.parent.id
+        try:
+            placeItemId = placeEnrichment['taskInstance'].get().get('task').get().get('itemId')
+        except:
+            continue
+        if authorId in chatbot1TelegramIds:
+            chatbotVersion = "Chatbot 1"
+        elif authorId in chatbot2TelegramIds:
+            chatbotVersion = "Chatbot 2"
+        else:
+            continue
+
+        for key in propertyKeys:
+            answer[key] = placeEnrichment.get(key, None)
+
+        placeItem = db.collection(domain + 'Items').document(placeItemId).get()
+        placeItemData = placeItem.to_dict()
+        answer['imageUrl'] = placeItemData.get('imageUrl', None)
+        answer['name'] = placeItemData.get('name', None)
+        answer['categoryName'] = placeItemData.get('categoryName', None)
+        answer['geolocation'] = placeItemData.get('geolocation', None)
+
+        print(rowTemplate.format(
+            chatbotVersion=chatbotVersion,
+            itemId=placeItemId,
+            taskType="enrich",
+            userId=authorId,
+            createdAt=placeEnrichment['createdAt'],
+            answer=answer
+        ))
+
+def print_answers_validate(domain="place"):
+    propertyKeys = [
+        "imageUrl", "name", "categoryName", "geolocation", 
+        "buildingName", "floorNumber", "route", "seatCapacity",
+        "isPlace", "isCategoryValid", "isBuildingValid", "isFloorNumberValid", "isBuildingNumberValid", "isRouteValid", "hasElectricityOutlet", "isSeatCapacityValid"]
+    # header
+    print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\t{propertyKeys}".format(propertyKeys="\t".join(propertyKeys)))
+    rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t" + ("\t".join(["{answer["+propKey+"]}" for propKey in propertyKeys]))
+    # place validations
+    getPlaceValidations = db.collection(domain + 'Validations').get()
+    allPlaceValidations = [x.to_dict() for x in getPlaceValidations]
+    chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
+    chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
+
+    for placeValidation in allPlaceValidations:
+        answer = {}
+        authorId = placeValidation['taskInstance'].parent.parent.id
+        try:
+            placeTask = placeValidation['taskInstance'].get().get('task').get()
+            placeItemId = placeTask.get('itemId')
+        except:
+            continue
+        if authorId in chatbot1TelegramIds:
+            chatbotVersion = "Chatbot 1"
+        elif authorId in chatbot2TelegramIds:
+            chatbotVersion = "Chatbot 2"
+        else:
+            continue
+
+
+        placeAggregation = placeTask.to_dict().get("aggregatedAnswers", {})
+        for key in propertyKeys:
+            answer[key] = placeAggregation.get(key, placeValidation.get(key, None))
+
+        print(rowTemplate.format(
+            chatbotVersion=chatbotVersion,
+            itemId=placeItemId,
+            taskType="validate",
+            userId=authorId,
+            createdAt=placeValidation['createdAt'],
+            answer=answer
+        ))
+
+print_answers_validate()
 
 

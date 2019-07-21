@@ -7,10 +7,12 @@ from google.cloud.firestore_v1beta1 import ArrayUnion
 import settings as env
 from bunch import Bunch
 import google.cloud.exceptions
+from firebase_admin import storage
 
 cred = credentials.Certificate(env.FIRESTORE_SERVICE_ACCOUNT_PATH)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
+bucket = storage.bucket(env.FIREBASE_STORAGE_BUCKET)
 
 def getCollection(collectionName, populate=False, asDict=False):
     ref = db.collection(collectionName)
@@ -103,3 +105,12 @@ def getDocumentsFromSubcollection(collectionName, documentId, subCollectionName,
 
 def getDocumentRef(collectionname, documentId):
     return db.collection(collectionname).document(documentId)
+
+def upload_blob(source_file_name, destination_blob_name):
+    blob = bucket.blob(destination_blob_name)
+
+    blob.upload_from_filename(source_file_name)
+    blob.make_public()
+    print(blob.public_url)
+
+    return blob.public_url

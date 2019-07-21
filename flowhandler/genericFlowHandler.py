@@ -268,8 +268,11 @@ class GenericFlowHandler(object):
         elif typeOfQuestion == questionType.QUESTION_TYPE_IMAGE:
             # download image    
             fileName = update.message.photo[-1].file_id
-            imageFile = update.message.photo[-1].get_file().download(custom_path='{imagePath}/{fileName}.jpg'.format(imagePath=env.IMAGE_DOWNLOAD_PATH, fileName=fileName))
-            answer = u'{imageUrlPrefix}/{fileName}.jpg'.format(imageUrlPrefix=env.IMAGE_URL_PREFIX, fileName=fileName)
+            imageFilePath = '{imagePath}/{fileName}.jpg'.format(imagePath=env.IMAGE_DOWNLOAD_PATH, fileName=fileName)
+            imageFile = update.message.photo[-1].get_file().download(custom_path=imageFilePath)
+            # upload
+            answer = FirestoreClient.upload_blob(imageFilePath, "campusbot/{fileName}".format(fileName=fileName))
+            # answer = u'{imageUrlPrefix}/{fileName}.jpg'.format(imageUrlPrefix=env.IMAGE_URL_PREFIX, fileName=fileName)
             temporaryAnswer['imageTelegramFileId'] = fileName
         elif typeOfQuestion == questionType.QUESTION_TYPE_LOCATION:
             answer = {'latitude': update.message.location.latitude, 'longitude': update.message.location.longitude}

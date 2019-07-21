@@ -14,6 +14,7 @@ Before setting up the campusbot, you would need to run a local installation of t
 
 ## Setting up firestore and firebase storage
 Refer to https://firebase.google.com/docs/firestore/quickstart and https://firebase.google.com/docs/storage
+
 Download your service account private key (https://firebase.google.com/docs/firestore/quickstart#initialize).
 
 ## How to Run (for development environment)

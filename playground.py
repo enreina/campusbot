@@ -272,6 +272,19 @@ def fix_image_url():
                 print(imageUrl)
                 db.collection(domain + 'Items').document(item.id).update({'imageUrl': imageUrl})
 
+def move_image_to_firebase_storage():
+    for domain in ['place', 'trashBin', 'question', 'food']:
+        items = db.collection(domain + 'Items').get()
+
+        for item in items:
+            itemDict = item.to_dict()
+            imageTelegramFileId = itemDict.get('imageTelegramFileId', None)
+            if imageTelegramFileId is not None:
+                imageUrl = u"https://firebasestorage.googleapis.com/v0/b/campusbot-b7b7f.appspot.com/o/campusbot%2F{imageTelegramFileId}.jpg?alt=media&token=27af2a94-be62-456c-b9c2-1b3efa2c465b".format(
+                    imageTelegramFileId=imageTelegramFileId
+                )
+                db.collection(domain + 'Items').document(item.id).update({'imageUrl': imageUrl})
+
 def count_skip():
     for user in chatbotv1Users + chatbotv2Users:
         skipUtterances = db.collection('users').document(user['telegramId']).collection('utterances').where(u'text', u'==', u'/skip').get()
@@ -283,12 +296,16 @@ def count_skip():
         ))
 
 def print_answers_create(domain="place"):
-    propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+    if domain == "place":
+        propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+    elif domain == "food":
+        propertyKeys = ["imageUrl", "name", "price", "geolocation", "foodLocation"]
+    
     # header
     print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\t{propertyKeys}".format(propertyKeys="\t".join(propertyKeys)))
     rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t" + ("\t".join(["{answer["+propKey+"]}" for propKey in propertyKeys]))
+    
     # place items
-
     getPlaceItems = db.collection(domain + 'Items').get()
     allPlaceItems = [(x.id, x.to_dict()) for x in getPlaceItems]
     chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
@@ -296,9 +313,6 @@ def print_answers_create(domain="place"):
 
     for placeItemId, placeItem in allPlaceItems:
         authorId = placeItem.get('authorId', None)
-        if 'executionStartTime' not in placeItem:
-            continue
-        executionTime = (placeItem['createdAt'] - placeItem['executionStartTime']).total_seconds()
         if authorId in chatbot1TelegramIds and 'executionStartTime' in placeItem:
             chatbotVersion = "Chatbot 1"
         elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeItem:
@@ -320,7 +334,11 @@ def print_answers_create(domain="place"):
         ))
 
 def print_answers_enrich(domain="place"):
-    propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+    if domain == 'place':
+        propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+    elif domain == "food":
+        propertyKeys = ["imageUrl", "mealCategory", "priceOpinion"]
+        
     # header
     print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\t{propertyKeys}".format(propertyKeys="\t".join(propertyKeys)))
     rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t" + ("\t".join(["{answer["+propKey+"]}" for propKey in propertyKeys]))
@@ -332,8 +350,8 @@ def print_answers_enrich(domain="place"):
 
     for placeEnrichment in allPlaceEnrichments:
         answer = {}
-        authorId = placeEnrichment['taskInstance'].parent.parent.id
         try:
+            authorId = placeEnrichment['taskInstance'].parent.parent.id
             placeItemId = placeEnrichment['taskInstance'].get().get('task').get().get('itemId')
         except:
             continue
@@ -350,9 +368,10 @@ def print_answers_enrich(domain="place"):
         placeItem = db.collection(domain + 'Items').document(placeItemId).get()
         placeItemData = placeItem.to_dict()
         answer['imageUrl'] = placeItemData.get('imageUrl', None)
-        answer['name'] = placeItemData.get('name', None)
-        answer['categoryName'] = placeItemData.get('categoryName', None)
-        answer['geolocation'] = placeItemData.get('geolocation', None)
+        if domain == "place":
+            answer['name'] = placeItemData.get('name', None)
+            answer['categoryName'] = placeItemData.get('categoryName', None)
+            answer['geolocation'] = placeItemData.get('geolocation', None)
 
         print(rowTemplate.format(
             chatbotVersion=chatbotVersion,
@@ -364,10 +383,15 @@ def print_answers_enrich(domain="place"):
         ))
 
 def print_answers_validate(domain="place"):
-    propertyKeys = [
-        "imageUrl", "name", "categoryName", "geolocation", 
-        "buildingName", "floorNumber", "route", "seatCapacity",
-        "isPlace", "isCategoryValid", "isBuildingValid", "isFloorNumberValid", "isBuildingNumberValid", "isRouteValid", "hasElectricityOutlet", "isSeatCapacityValid"]
+    if domain == 'place':
+        propertyKeys = [
+            "imageUrl", "name", "categoryName", "geolocation", 
+            "buildingName", "floorNumber", "route", "seatCapacity",
+            "isPlace", "isCategoryValid", "isBuildingValid", "isFloorNumberValid", "isBuildingNumberValid", "isRouteValid", "hasElectricityOutlet", "isSeatCapacityValid"]
+    elif domain == 'food':
+        propertyKeys = [
+            "imageUrl", "isFoodPicture", "mealCategoryCheck"
+        ]
     # header
     print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\t{propertyKeys}".format(propertyKeys="\t".join(propertyKeys)))
     rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t" + ("\t".join(["{answer["+propKey+"]}" for propKey in propertyKeys]))
@@ -379,8 +403,8 @@ def print_answers_validate(domain="place"):
 
     for placeValidation in allPlaceValidations:
         answer = {}
-        authorId = placeValidation['taskInstance'].parent.parent.id
         try:
+            authorId = placeValidation['taskInstance'].parent.parent.id
             placeTask = placeValidation['taskInstance'].get().get('task').get()
             placeItemId = placeTask.get('itemId')
         except:
@@ -406,6 +430,4 @@ def print_answers_validate(domain="place"):
             answer=answer
         ))
 
-print_answers_validate()
-
-
+print_answers_enrich(domain="food")

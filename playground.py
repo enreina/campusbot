@@ -299,10 +299,11 @@ def move_image_to_firebase_storage():
             itemDict = item.to_dict()
             imageTelegramFileId = itemDict.get('imageTelegramFileId', None)
             if imageTelegramFileId is not None:
-                imageUrl = u"https://firebasestorage.googleapis.com/v0/b/campusbot-b7b7f.appspot.com/o/campusbot%2F{imageTelegramFileId}.jpg?alt=media&token=27af2a94-be62-456c-b9c2-1b3efa2c465b".format(
+                imageUrl = u"https://firebasestorage.googleapis.com/v0/b/campusbot-study2.appspot.com/o/campusbot%2F{imageTelegramFileId}.jpg?alt=media".format(
                     imageTelegramFileId=imageTelegramFileId
                 )
                 db.collection(domain + 'Items').document(item.id).update({'imageUrl': imageUrl})
+            
 
 def count_skip():
     for user in chatbotv1Users + chatbotv2Users:
@@ -449,4 +450,42 @@ def print_answers_validate(domain="place"):
             answer=answer
         ))
 
-summary_execution_time(domain="trashBin")
+def print_tasks(domain="place"):
+    allTasks = db.collection(domain + 'Tasks').get()
+    itemTaskDict = {}
+    for task in allTasks:
+        taskData = task.to_dict()
+        print(task.id)
+        # skip if the task is the do not assign one
+        if taskData.get('doNotAssign', False):
+            continue
+        # get the author
+        if 'item' in taskData:
+            item = taskData['item'].get().to_dict()
+            if item is not None:
+                if 'author' in item:
+                    author = item['author'].get().to_dict()
+                    # only if author is us
+                    if author is not None and (author.get('email',None) in excludeUsers or author.get('telegramId', None) in excludeUsers):
+                        taskData['prepopulated'] = True
+
+                taskData['taskId'] = task.id
+                if taskData['type'] == 0:
+                    taskData['typeString'] = 'enrich'
+                else:
+                    taskData['typeString'] = 'validate'
+                itemTaskDict[taskData['itemId']] = taskData
+
+    
+    print('TaskId\tItemId\tType\tPrepopulated')
+    for itemId, taskData in itemTaskDict.iteritems():
+        print("{taskId}\t{itemId}\t{type}\t{prepopulated}".format(
+            taskId=taskData['taskId'],
+            itemId=itemId,
+            type=taskData['typeString'],
+            prepopulated=taskData.get('prepopulated', False)
+        ))
+
+
+
+move_image_to_firebase_storage()

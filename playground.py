@@ -29,6 +29,7 @@ for user in allUsers:
         else:
             chatbotv1Users.append(userData)
     elif userData.get('email', False) and userData['email'] not in excludeUsers:
+        userData['id'] = user.id
         mobileAppUsers.append(userData)
         # if (numTasksCompleted > 1):
         #     activeUsers = activeUsers + 1
@@ -78,32 +79,37 @@ def count_user_conversion():
 
 def summary_execution_time(domain="place"):
     # executed time
-    print("ChatbotVersion\titemId\ttaskType\tuserId\tcreatedAt\texecutionTime")
-    rowTemplate = "{chatbotVersion}\t{itemId}\t{taskType}\t{userId}\t{createdAt}\t{executionTime}"
-    # only consider from this date
-    startTime = datetime.datetime(2019,5,16,tzinfo=tzlocal())
+    print("ChatbotVersion\titemId\tenrichmentId\tvalidationId\ttaskType\tuserId\tcreatedAt\texecutionTime")
+    rowTemplate = "{chatbotVersion}\t{itemId}\t{enrichmentId}\t{validationId}\t{taskType}\t{userId}\t{createdAt}\t{executionTime}"
     # place items
 
     getPlaceItems = db.collection(domain + 'Items').get()
     allPlaceItems = [(x.id, x.to_dict()) for x in getPlaceItems]
     chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
     chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
+    mobileAppIds = [x["id"] for x in mobileAppUsers]
 
     for placeItemId, placeItem in allPlaceItems:
         authorId = placeItem.get('authorId', None)
         if 'executionStartTime' not in placeItem:
-            continue
-        executionTime = (placeItem['createdAt'] - placeItem['executionStartTime']).total_seconds()
-        if authorId in chatbot1TelegramIds and 'executionStartTime' in placeItem:
+            executionTime = None
+        else:
+            executionTime = (placeItem['createdAt'] - placeItem['executionStartTime']).total_seconds()
+        
+        if authorId in chatbot1TelegramIds:
             chatbotVersion = "Chatbot 1"
-        elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeItem:
+        elif authorId in chatbot2TelegramIds:
             chatbotVersion = "Chatbot 2"
+        elif authorId in mobileAppIds:
+            chatbotVersion = "Mobile App" 
         else:
             continue
 
         print(rowTemplate.format(
             chatbotVersion=chatbotVersion,
             itemId=placeItemId,
+            enrichmentId=None,
+            validationId=None,
             taskType="create",
             userId=authorId,
             createdAt=placeItem['createdAt'],
@@ -112,30 +118,37 @@ def summary_execution_time(domain="place"):
 
     # place enrichments
     getPlaceEnrichments = db.collection(domain + 'Enrichments').get()
-    allPlaceEnrichments = [x.to_dict() for x in getPlaceEnrichments]
+    allPlaceEnrichments = [(x.id, x.to_dict()) for x in getPlaceEnrichments]
     chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
     chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
 
-    for placeEnrichment in allPlaceEnrichments:
+    for enrichmentId, placeEnrichment in allPlaceEnrichments:
         try: 
             authorId = placeEnrichment['taskInstance'].parent.parent.id
             if 'executionStartTime' not in placeEnrichment:
-                continue
-            executionTime = (placeEnrichment['createdAt'] - placeEnrichment['executionStartTime']).total_seconds()
+                executionTime = None
+            else:
+                executionTime = (placeEnrichment['createdAt'] - placeEnrichment['executionStartTime']).total_seconds()
+            
             try:
                 placeItemId = placeEnrichment['taskInstance'].get().get('task').get().get('itemId')
             except:
-                continue
-            if authorId in chatbot1TelegramIds and 'executionStartTime' in placeEnrichment:
+                placeItemId = None
+
+            if authorId in chatbot1TelegramIds:
                 chatbotVersion = "Chatbot 1"
-            elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeEnrichment:
+            elif authorId in chatbot2TelegramIds:
                 chatbotVersion = "Chatbot 2"
+            elif authorId in mobileAppIds:
+                chatbotVersion = "Mobile App" 
             else:
                 continue
 
             print(rowTemplate.format(
                 chatbotVersion=chatbotVersion,
                 itemId=placeItemId,
+                enrichmentId=enrichmentId,
+                validationId=None,
                 taskType="enrich",
                 userId=authorId,
                 createdAt=placeEnrichment['createdAt'],
@@ -146,30 +159,36 @@ def summary_execution_time(domain="place"):
 
     # place validations
     getPlaceValidations = db.collection(domain + 'Validations').get()
-    allPlaceValidations = [x.to_dict() for x in getPlaceValidations]
+    allPlaceValidations = [(x.id, x.to_dict()) for x in getPlaceValidations]
     chatbot1TelegramIds = [x['telegramId'] for x in chatbotv1Users]
     chatbot2TelegramIds = [x['telegramId'] for x in chatbotv2Users]
 
-    for placeValidation in allPlaceValidations:
+    for validationId,placeValidation in allPlaceValidations:
         try:
             authorId = placeValidation['taskInstance'].parent.parent.id
             if 'executionStartTime' not in placeValidation:
-                continue
-            executionTime = (placeValidation['createdAt'] - placeValidation['executionStartTime']).total_seconds()
-            try:
-                placeItemId = placeValidation['taskInstance'].get().get('task').get().get('itemId')
-            except:
-                continue
-            if authorId in chatbot1TelegramIds and 'executionStartTime' in placeValidation:
+                executionTime = None
+            else:
+                executionTime = (placeValidation['createdAt'] - placeValidation['executionStartTime']).total_seconds()
+                try:
+                    placeItemId = placeValidation['taskInstance'].get().get('task').get().get('itemId')
+                except:
+                    placeItemId = None
+
+            if authorId in chatbot1TelegramIds:
                 chatbotVersion = "Chatbot 1"
-            elif authorId in chatbot2TelegramIds and 'executionStartTime' in placeValidation:
+            elif authorId in chatbot2TelegramIds:
                 chatbotVersion = "Chatbot 2"
+            elif authorId in mobileAppIds:
+                chatbotVersion = "Mobile App" 
             else:
                 continue
 
             print(rowTemplate.format(
                 chatbotVersion=chatbotVersion,
                 itemId=placeItemId,
+                enrichmentId=None,
+                validationId=validationId,
                 taskType="validate",
                 userId=authorId,
                 createdAt=placeValidation['createdAt'],
@@ -280,10 +299,11 @@ def move_image_to_firebase_storage():
             itemDict = item.to_dict()
             imageTelegramFileId = itemDict.get('imageTelegramFileId', None)
             if imageTelegramFileId is not None:
-                imageUrl = u"https://firebasestorage.googleapis.com/v0/b/campusbot-b7b7f.appspot.com/o/campusbot%2F{imageTelegramFileId}.jpg?alt=media&token=27af2a94-be62-456c-b9c2-1b3efa2c465b".format(
+                imageUrl = u"https://firebasestorage.googleapis.com/v0/b/campusbot-study2.appspot.com/o/campusbot%2F{imageTelegramFileId}.jpg?alt=media".format(
                     imageTelegramFileId=imageTelegramFileId
                 )
                 db.collection(domain + 'Items').document(item.id).update({'imageUrl': imageUrl})
+            
 
 def count_skip():
     for user in chatbotv1Users + chatbotv2Users:
@@ -430,4 +450,42 @@ def print_answers_validate(domain="place"):
             answer=answer
         ))
 
-print_answers_enrich(domain="food")
+def print_tasks(domain="place"):
+    allTasks = db.collection(domain + 'Tasks').get()
+    itemTaskDict = {}
+    for task in allTasks:
+        taskData = task.to_dict()
+        print(task.id)
+        # skip if the task is the do not assign one
+        if taskData.get('doNotAssign', False):
+            continue
+        # get the author
+        if 'item' in taskData:
+            item = taskData['item'].get().to_dict()
+            if item is not None:
+                if 'author' in item:
+                    author = item['author'].get().to_dict()
+                    # only if author is us
+                    if author is not None and (author.get('email',None) in excludeUsers or author.get('telegramId', None) in excludeUsers):
+                        taskData['prepopulated'] = True
+
+                taskData['taskId'] = task.id
+                if taskData['type'] == 0:
+                    taskData['typeString'] = 'enrich'
+                else:
+                    taskData['typeString'] = 'validate'
+                itemTaskDict[taskData['itemId']] = taskData
+
+    
+    print('TaskId\tItemId\tType\tPrepopulated')
+    for itemId, taskData in itemTaskDict.iteritems():
+        print("{taskId}\t{itemId}\t{type}\t{prepopulated}".format(
+            taskId=taskData['taskId'],
+            itemId=itemId,
+            type=taskData['typeString'],
+            prepopulated=taskData.get('prepopulated', False)
+        ))
+
+
+
+move_image_to_firebase_storage()

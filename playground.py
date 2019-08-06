@@ -317,7 +317,7 @@ def count_skip():
 
 def print_answers_create(domain="place"):
     if domain == "place":
-        propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+        propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "buildingNumber", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
     elif domain == "food":
         propertyKeys = ["imageUrl", "name", "price", "geolocation", "foodLocation"]
     
@@ -342,7 +342,7 @@ def print_answers_create(domain="place"):
 
         answer = {}
         for key in propertyKeys:
-            answer[key] = placeItem.get(key, None)
+            answer[key] = placeItem.get(key, "None")
 
         print(rowTemplate.format(
             chatbotVersion=chatbotVersion,
@@ -355,7 +355,7 @@ def print_answers_create(domain="place"):
 
 def print_answers_enrich(domain="place"):
     if domain == 'place':
-        propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
+        propertyKeys = ["imageUrl", "name", "categoryName", "geolocation", "buildingName", "buildingNumber", "floorNumber", "route", "hasElectricityOutlet", "seatCapacity"]
     elif domain == "food":
         propertyKeys = ["imageUrl", "mealCategory", "priceOpinion"]
         
@@ -487,5 +487,14 @@ def print_tasks(domain="place"):
         ))
 
 
+def print_wikibase_items(domain="place"):
+    placeItems = db.collection("placeItems").get()
+    placeItems = [x for x in placeItems]
 
-move_image_to_firebase_storage()
+def calculateTime(userId, messageId1, messageId2):
+    message1 = db.collection("users").document(userId).collection("utterances").document(messageId1).get()
+    message2 = db.collection("users").document(userId).collection("utterances").document(messageId2).get()
+
+    print((message2.to_dict()['createdAt'] - message1.to_dict()['createdAt']).total_seconds())
+
+count_user_conversion()
